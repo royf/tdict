@@ -1,2 +1,2 @@
-# dicttree
-Tree of dicts for easy handling of configurations and results
+# tdict
+Tree-structured `dict` for easy handling of configurations and results

@@ -203,6 +203,11 @@ class Tdict(abc.MutableMapping):
         return sum(len(v) if isinstance(v, Tdict) else 1 for v in self.values())
 
     def __repr__(self):
+        """
+
+        Returns:
+            str: String representation of `self`.
+        """
         return f'Tdict({", ".join(f"{k}={v!r}" for k, v in vars(self).items())})'
 
     def __contains__(self, k):
@@ -289,7 +294,7 @@ class Tdict(abc.MutableMapping):
             return m.items()
 
 
-class Op(object):
+class _Op(object):
     def __init__(self, o, inplace=True):
         self.o = o
         self.inplace = inplace
@@ -303,7 +308,7 @@ class Op(object):
         return apply.__get__(obj, objtype)
 
 
-OPERATORS = {
+_OPERATORS = {
     'or': None,
     'add': operator.iadd,
     'truediv': operator.itruediv,
@@ -317,6 +322,6 @@ OPERATORS = {
     'sub': operator.isub,
 }
 
-for name, op in OPERATORS.items():
-    setattr(Tdict, f'__{name}__', Op(op, False))
-    setattr(Tdict, f'__i{name}__', Op(op, True))
+for name, op in _OPERATORS.items():
+    setattr(Tdict, f'__{name}__', _Op(op, False))
+    setattr(Tdict, f'__i{name}__', _Op(op, True))
