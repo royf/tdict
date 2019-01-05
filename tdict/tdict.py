@@ -46,7 +46,7 @@ class Tdict(abc.MutableMapping):
      ('f', 6),
      ('g', 7)]
     >>> len(d)
-    8
+    10
 
     @DynamicAttrs
     """
@@ -77,17 +77,22 @@ class Tdict(abc.MutableMapping):
         Returns:
             Item value.
         """
-        if isinstance(k, tuple):
-            if len(k) == 0:
-                return self
-            elif len(k) == 1:
-                return vars(self)[k[0]]
+        try:
+            if isinstance(k, tuple):
+                if len(k) == 0:
+                    return self
+                else:
+                    d = vars(self)[k[0]]
+                    if len(k) == 1:
+                        return d
+                    elif isinstance(d, Tdict):
+                        return vars(self)[k[0]][k[1:]]
+                    else:
+                        raise KeyError(k[0])
             else:
-                return vars(self)[k[0]][k[1:]]
-        else:
-            return vars(self)[k]
-
-    __getattr__ = __getitem__
+                return vars(self)[k]
+        except KeyError:
+            raise KeyError(k)
 
     def __setitem__(self, k, v):
         """
@@ -99,15 +104,24 @@ class Tdict(abc.MutableMapping):
         Raises:
             KeyError: Item key is an empty `tuple`.
         """
-        if isinstance(k, tuple):
-            if len(k) == 0:
-                raise KeyError("cannot assign to root")
-            elif len(k) == 1:
-                vars(self)[k[0]] = v
+        try:
+            if isinstance(k, tuple):
+                if len(k) == 0:
+                    raise KeyError("cannot assign to root")
+                elif len(k) == 1:
+                    vars(self)[k[0]] = v
+                elif k[0] not in vars(self):
+                    d = Tdict()
+                    d[k[1:]] = v
+                    vars(self)[k[0]] = d
+                elif isinstance(vars(self)[k[0]], Tdict):
+                    vars(self)[k[0]][k[1:]] = v
+                else:
+                    raise KeyError(k[0])
             else:
-                vars(self).setdefault(k[0], Tdict())[k[1:]] = v
-        else:
-            vars(self)[k] = v
+                vars(self)[k] = v
+        except KeyError:
+            raise KeyError(k)
 
     __setattr__ = __setitem__
 
@@ -120,15 +134,20 @@ class Tdict(abc.MutableMapping):
         Raises:
             KeyError: Item key is an empty `tuple`.
         """
-        if isinstance(k, tuple):
-            if len(k) == 0:
-                raise KeyError("cannot delete root")
-            elif len(k) == 1:
-                del vars(self)[k[0]]
+        try:
+            if isinstance(k, tuple):
+                if len(k) == 0:
+                    raise KeyError("cannot delete root")
+                elif len(k) == 1:
+                    del vars(self)[k[0]]
+                elif k[0] in vars(self) and isinstance(vars(self)[k[0]], Tdict):
+                    del vars(self)[k[0]][k[1:]]
+                else:
+                    raise KeyError(k[0])
             else:
-                del vars(self)[k[0]][k[1:]]
-        else:
-            del vars(self)[k]
+                del vars(self)[k]
+        except KeyError:
+            raise KeyError(k)
 
     def keys(self, deep=True):
         """
@@ -200,7 +219,7 @@ class Tdict(abc.MutableMapping):
         Returns:
             int: Number of leaf (non-`Tdict`) values.
         """
-        return sum(len(v) if isinstance(v, Tdict) else 1 for v in self.values())
+        return sum(1 for _ in self.values())
 
     def __repr__(self):
         """
@@ -226,7 +245,8 @@ class Tdict(abc.MutableMapping):
                 return k[0] in vars(self)
             else:
                 if k[0] in vars(self):
-                    return k[1:] in vars(self)[k[0]]
+                    d = vars(self)[k[0]]
+                    return isinstance(d, Tdict) and k[1:] in d
                 else:
                     return False
         else:
@@ -250,8 +270,8 @@ class Tdict(abc.MutableMapping):
         """
         Update self from another `Mapping` or a constant.
         Update from a `Mapping` sets the values of keys of `d` that are missing in `self`,
-            and applies `o` to values of shared keys.
-        Update from a constant applies `o` to values of `self`.
+            and applies binary operator `o(self[k], d[k])` to values of shared keys.
+        Update from a constant applies `o(self[k], d)` to values of `self`.
 
         Args:
             d: Update from a `Mapping` or a constant.
