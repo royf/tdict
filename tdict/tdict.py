@@ -281,6 +281,12 @@ class Tdict(abc.MutableMapping):
         Returns:
             Tdict: `self` after update.
         """
+        def _ensure_tdict(x):
+            if isinstance(v, abc.Mapping) and not isinstance(v, Tdict):
+                return Tdict(x)
+            else:
+                return v
+
         if isinstance(d, abc.Mapping):
             for k, v in Tdict._shallow_items(d):
                 if k in vars(self):
@@ -291,11 +297,11 @@ class Tdict(abc.MutableMapping):
                         else:
                             vars(self)[k] = v
                     elif o is None:
-                        vars(self)[k] = v
+                        vars(self)[k] = _ensure_tdict(v)
                     else:
                         vars(self)[k] = o(v_, v)
                 else:
-                    vars(self)[k] = v
+                    vars(self)[k] = _ensure_tdict(v)
         else:
             for k, v in vars(self).items():
                 if isinstance(v, Tdict):
