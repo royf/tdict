@@ -1,0 +1,11 @@
+{% set version = "0.1.3" %}
+
+package:
+  name: tdict
+  version: {{ version }}
+
+about:
+  home: https://github.com/royf/tdict
+  license: MIT
+  summary: 'Getting image size from png/jpeg/jpeg2000/gif file'
+  description: Tree-structured dict for easy handling of configurations and results
