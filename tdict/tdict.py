@@ -1,6 +1,7 @@
 import operator
 from collections import abc
 from typing import Mapping
+from typing import Sequence
 
 
 class Tdict(abc.MutableMapping):
@@ -57,7 +58,7 @@ class Tdict(abc.MutableMapping):
         Args:
             *maps (Mapping): Update attributes from these `Mapping`s.
                              Values that are themselves `Mapping`s are deep-copied as sub-`Tdict`s.
-            **attr: Extra attributes (not copied).
+            **attr: Extra attributes.
         """
         super().__init__()
         for m in maps:
@@ -164,7 +165,7 @@ class Tdict(abc.MutableMapping):
                     for k_ in v.keys():
                         yield (k,) + k_
                 else:
-                    yield (k,)
+                    yield k,
         else:
             yield from vars(self).keys()
 
@@ -281,6 +282,7 @@ class Tdict(abc.MutableMapping):
         Returns:
             Tdict: `self` after update.
         """
+
         def _ensure_tdict(x):
             if isinstance(v, abc.Mapping) and not isinstance(v, Tdict):
                 return Tdict(x)
@@ -351,3 +353,27 @@ _OPERATORS = {
 for name, op in _OPERATORS.items():
     setattr(Tdict, f'__{name}__', _Op(op, False))
     setattr(Tdict, f'__i{name}__', _Op(op, True))
+
+
+def tdictify(x, through=None):
+    """
+    Return a recursively `Tdict`ified version of `x`:
+        If `x` is a `Mapping`, return a `Tdict` with the same keys and `Tdict`ified values.
+        If `x` is an instance of a type in `through`, return a new instance of that type with `Tdict`ified elements.
+        Otherwise, return `x`.
+
+    Args:
+        x: The object to `Tdict`ify.
+        through (Sequence[type]): list of types through which to deep-copy and `Tdict`ify; e.g., `[list, tuple]`.
+
+    Returns:
+        Tdict: `Tdict`ified version of `x`.
+    """
+    if isinstance(x, abc.Mapping):
+        return Tdict({k: tdictify(v, through) for k, v in x.items()})
+    if through:
+        for t in through:
+            if isinstance(x, t):
+                # noinspection PyTypeChecker
+                return t(tdictify(v, through) for v in x)
+    return x
