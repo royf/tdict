@@ -93,7 +93,7 @@ class Tdict(abc.MutableMapping):
             else:
                 return vars(self)[k]
         except KeyError:
-            raise KeyError(k)
+            raise KeyError(k) from None
 
     def __setitem__(self, k, v):
         """
@@ -122,7 +122,7 @@ class Tdict(abc.MutableMapping):
             else:
                 vars(self)[k] = v
         except KeyError:
-            raise KeyError(k)
+            raise KeyError(k) from None
 
     __setattr__ = __setitem__
 
@@ -148,7 +148,7 @@ class Tdict(abc.MutableMapping):
             else:
                 del vars(self)[k]
         except KeyError:
-            raise KeyError(k)
+            raise KeyError(k) from None
 
     def keys(self, deep=True):
         """
