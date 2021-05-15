@@ -62,7 +62,7 @@ class Tdict(abc.MutableMapping):
         """
         super().__init__()
         for m in maps:
-            for k, v in Tdict._shallow_items(m):
+            for k, v in shallow_items(m):
                 if isinstance(v, abc.Mapping):
                     vars(self).setdefault(k, Tdict()).update(v)
                 else:
@@ -253,19 +253,33 @@ class Tdict(abc.MutableMapping):
         else:
             return k in vars(self)
 
-    def copy(self):
+    def copy(self, exclude=None):
         """
+
+        Args:
+            exclude: Container of shallow keys to exclude. Default: no keys excluded.
 
         Returns:
             Tdict: Deep copy of `self`.
         """
         res = Tdict()
-        for k, v in self.items(False):
+        for k, v in vars(self).items():
+            if exclude is not None and k in exclude:
+                continue
             if isinstance(v, Tdict):
                 vars(res)[k] = v.copy()
             else:
                 vars(res)[k] = v
         return res
+
+    def __xor__(self, other):
+        """
+        Shorthand for `self.copy(exclude=other)`.
+
+        Returns:
+            Tdict: Copy of `self` with shallow keys in `other` excluded.
+        """
+        return self.copy(other)
 
     def update(self, d, o=None):
         """
@@ -282,15 +296,8 @@ class Tdict(abc.MutableMapping):
         Returns:
             Tdict: `self` after update.
         """
-
-        def _ensure_tdict(x):
-            if isinstance(v, abc.Mapping) and not isinstance(v, Tdict):
-                return Tdict(x)
-            else:
-                return v
-
         if isinstance(d, abc.Mapping):
-            for k, v in Tdict._shallow_items(d):
+            for k, v in shallow_items(d):
                 if k in vars(self):
                     v_ = vars(self)[k]
                     if isinstance(v_, Tdict):
@@ -299,11 +306,11 @@ class Tdict(abc.MutableMapping):
                         else:
                             vars(self)[k] = v
                     elif o is None:
-                        vars(self)[k] = _ensure_tdict(v)
+                        vars(self)[k] = ensure_tdict(v)
                     else:
                         vars(self)[k] = o(v_, v)
                 else:
-                    vars(self)[k] = _ensure_tdict(v)
+                    vars(self)[k] = ensure_tdict(v)
         else:
             for k, v in vars(self).items():
                 if isinstance(v, Tdict):
@@ -314,12 +321,19 @@ class Tdict(abc.MutableMapping):
                     vars(self)[k] = o(v, d)
         return self
 
-    @staticmethod
-    def _shallow_items(m):
-        if isinstance(m, Tdict):
-            return m.items(False)
-        else:
-            return m.items()
+
+def shallow_items(m):
+    if isinstance(m, Tdict):
+        return m.items(False)
+    else:
+        return m.items()
+
+
+def ensure_tdict(x):
+    if isinstance(x, abc.Mapping) and not isinstance(x, Tdict):
+        return Tdict(x)
+    else:
+        return x
 
 
 class _Op(object):
