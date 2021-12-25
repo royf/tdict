@@ -17,7 +17,6 @@ class Tdict(abc.MutableMapping):
             b=2, **{'c': 3}, d=4)
     >>> d
     Tdict(a=1, sub=Tdict(('non-str', 'keys', 'allowed')=True, x=10), b=2, c=3, d=4)
-    >>> assert d[()] is d
     >>> d.a
     1
     >>> d['b']
@@ -34,20 +33,39 @@ class Tdict(abc.MutableMapping):
     >>> d['sub', 'y']
     11
     >>> d |= {'g': 7}
+    >>> d ^= {'b'}
     >>> d += {'a': 100}
-    >>> d * Tdict(sub=Tdict(y=7)) + dict(sub=100)
-    Tdict(a=101, sub=Tdict(('non-str', 'keys', 'allowed')=101, x=110, y=177), b=2, c=3, d=4, e=5, f=6, g=7)
+    >>> len(d)
+    9
+    >>> list(d.items())
+    [(('a',), 101),
+     (('sub', ('non-str', 'keys', 'allowed')), True),
+     (('sub', 'x'), 10),
+     (('sub', 'y'), 11),
+     (('c',), 3),
+     (('d',), 4),
+     (('e',), 5),
+     (('f',), 6),
+     (('g',), 7)]
     >>> list(d.items(deep=False))
     [('a', 101),
      ('sub', Tdict(('non-str', 'keys', 'allowed')=True, x=10, y=11)),
-     ('b', 2),
      ('c', 3),
      ('d', 4),
      ('e', 5),
      ('f', 6),
      ('g', 7)]
-    >>> len(d)
+    >>> d * Tdict(sub=Tdict(y=7)) + dict(sub=100)
+    Tdict(a=101, sub=Tdict(('non-str', 'keys', 'allowed')=101, x=110, y=177), c=3, d=4, e=5, f=6, g=7)
+    >>> match d:  # new in Python 3.10
+            case {'c': z}:
+                print(z)
+    3
+    >>> match d:  # new in Python 3.10
+            case Tdict(sub=Tdict(x=w)):
+                print(w)
     10
+    >>> assert d[()] is d
 
     @DynamicAttrs
     """
