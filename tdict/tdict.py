@@ -11,6 +11,8 @@ class Tdict(abc.MutableMapping):
     Values of `str` keys can be accessed either as attributes or as items.
     Values of `tuple` keys are stored in nested `Tdict`s.
 
+    >>> from tdict import Tdict
+    >>> import json
     >>> d = Tdict(
             {'a': 1, 'sub': {tuple('non-str keys allowed'.split()): True}},
             json.loads('{"sub": {"x": 10}}'),
@@ -55,6 +57,9 @@ class Tdict(abc.MutableMapping):
      ('e', 5),
      ('f', 6),
      ('g', 7)]
+    >>> z = d.copy()
+    >>> z.set_deep(False)
+    >>> assert list(z.items()) == list(d.items(deep=False)) == list(d.as_deep(False).items())
     >>> d * Tdict(sub=Tdict(y=7)) + dict(sub=100)
     Tdict(a=101, sub=Tdict(('non-str', 'keys', 'allowed')=101, x=110, y=177), c=3, d=4, e=5, f=6, g=7)
     >>> match d:  # new in Python 3.10
@@ -70,19 +75,24 @@ class Tdict(abc.MutableMapping):
     @DynamicAttrs
     """
 
-    def __init__(self, *maps, **attr):
+    def __new__(cls, *maps, deep=True, **attr):
+        return super().__new__(type('Tdict', (Tdict,), {'_deep': deep}))
+
+    def __init__(self, *maps, deep=True, **attr):
         """
 
         Args:
             *maps (Mapping): Update attributes from these `Mapping`s.
                              Values that are themselves `Mapping`s are deep-copied as sub-`Tdict`s.
+            deep (bool): whether to iterate keys, values, and items recursively by default.
             **attr: Extra attributes.
         """
         super().__init__()
         for m in maps:
-            for k, v in shallow_items(m):
+            shallow_map = vars(m) if isinstance(m, Tdict) else m
+            for k, v in shallow_map.items():
                 if isinstance(v, abc.Mapping):
-                    vars(self).setdefault(k, Tdict()).update(v)
+                    vars(self).setdefault(k, Tdict(deep=deep)).update(v)
                 else:
                     vars(self)[k] = v
         self.update(attr)
@@ -130,7 +140,7 @@ class Tdict(abc.MutableMapping):
                 elif len(k) == 1:
                     vars(self)[k[0]] = v
                 elif k[0] not in vars(self):
-                    d = Tdict()
+                    d = Tdict(deep=self._deep)
                     d[k[1:]] = v
                     vars(self)[k[0]] = d
                 elif isinstance(vars(self)[k[0]], Tdict):
@@ -168,61 +178,55 @@ class Tdict(abc.MutableMapping):
         except KeyError:
             raise KeyError(k) from None
 
-    def keys(self, deep=True):
+    def set_deep(self, deep):
+        type(self)._deep = deep
+
+    def as_deep(self, deep):
+        d = self.copy()
+        d.set_deep(deep)
+        return d
+
+    def keys(self, deep=None):
         """
 
         Args:
-            deep (bool)
+            deep (bool): whether to iterate recursively.
 
         Yields:
             Next key.
         """
-        if deep:
-            for k, v in vars(self).items():
-                if isinstance(v, Tdict):
-                    for k_ in v.keys():
-                        yield (k,) + k_
-                else:
-                    yield k,
+        if deep or (deep is None and self._deep):
+            return tdict_keys(self, deep)
         else:
-            yield from vars(self).keys()
+            return vars(self).keys()
 
-    def items(self, deep=True):
+    def values(self, deep=None):
         """
 
         Args:
-            deep (bool)
-
-        Yields:
-            Next item.
-        """
-        if deep:
-            for k, v in vars(self).items():
-                if isinstance(v, Tdict):
-                    for k_, v_ in v.items():
-                        yield (k,) + k_, v_
-                else:
-                    yield (k,), v
-        else:
-            yield from vars(self).items()
-
-    def values(self, deep=True):
-        """
-
-        Args:
-            deep (bool)
+            deep (bool): whether to iterate recursively.
 
         Yields:
             Next value.
         """
-        if deep:
-            for v in vars(self).values():
-                if isinstance(v, Tdict):
-                    yield from v.values()
-                else:
-                    yield v
+        if deep or (deep is None and self._deep):
+            return tdict_values(self, deep)
         else:
-            yield from vars(self).values()
+            return vars(self).values()
+
+    def items(self, deep=None):
+        """
+
+        Args:
+            deep (bool): whether to iterate recursively.
+
+        Yields:
+            Next item.
+        """
+        if deep or (deep is None and self._deep):
+            return tdict_items(self, deep)
+        else:
+            return vars(self).items()
 
     def __iter__(self):
         """
@@ -280,7 +284,7 @@ class Tdict(abc.MutableMapping):
         Returns:
             Tdict: Deep copy of `self`.
         """
-        res = Tdict()
+        res = Tdict(deep=self._deep)
         for k, v in vars(self).items():
             if exclude is not None and k in exclude:
                 continue
@@ -315,7 +319,8 @@ class Tdict(abc.MutableMapping):
             Tdict: `self` after update.
         """
         if isinstance(d, abc.Mapping):
-            for k, v in shallow_items(d):
+            shallow_map = vars(d) if isinstance(d, Tdict) else d
+            for k, v in shallow_map.items():
                 if k in vars(self):
                     v_ = vars(self)[k]
                     if isinstance(v_, Tdict):
@@ -340,18 +345,38 @@ class Tdict(abc.MutableMapping):
         return self
 
 
-def shallow_items(m):
-    if isinstance(m, Tdict):
-        return m.items(False)
-    else:
-        return m.items()
+def tdict_keys(d, deep):
+    for k, v in vars(d).items():
+        if isinstance(v, Tdict):
+            for k_ in v.keys(deep):
+                # noinspection PyProtectedMember
+                if deep or (deep is None and v._deep):
+                    yield (k,) + k_
+                else:
+                    yield k, k_
+        else:
+            yield k,
 
 
-def ensure_tdict(x):
-    if isinstance(x, abc.Mapping) and not isinstance(x, Tdict):
-        return Tdict(x)
-    else:
-        return x
+def tdict_values(d, deep):
+    for v in vars(d).values():
+        if isinstance(v, Tdict):
+            yield from v.values(deep)
+        else:
+            yield v
+
+
+def tdict_items(d, deep):
+    for k, v in vars(d).items():
+        if isinstance(v, Tdict):
+            for k_, v_ in v.items(deep):
+                # noinspection PyProtectedMember
+                if deep or (deep is None and v._deep):
+                    yield (k,) + k_, v_
+                else:
+                    yield (k, k_), v_
+        else:
+            yield (k,), v
 
 
 class _Op(object):
@@ -383,11 +408,18 @@ _OPERATORS = {
 }
 
 for name, op in _OPERATORS.items():
-    setattr(Tdict, f'__{name}__', _Op(op, False))
-    setattr(Tdict, f'__i{name}__', _Op(op, True))
+    setattr(Tdict, f'__{name}__', _Op(op, inplace=False))
+    setattr(Tdict, f'__i{name}__', _Op(op, inplace=True))
 
 
-def tdictify(x, through=None):
+def ensure_tdict(x, deep=True):
+    if isinstance(x, abc.Mapping) and not isinstance(x, Tdict):
+        return Tdict(x, deep=deep)
+    else:
+        return x
+
+
+def tdictify(x, through=None, deep=True):
     """
     Return a recursively `Tdict`ified version of `x`:
         If `x` is a `Mapping`, return a `Tdict` with the same keys and `Tdict`ified values.
@@ -397,15 +429,19 @@ def tdictify(x, through=None):
     Args:
         x: The object to `Tdict`ify.
         through (Sequence[type]): list of types through which to deep-copy and `Tdict`ify; e.g., `[list, tuple]`.
+        deep (bool): whether the constructed Tdict iterates keys, values, and items recursively by default.
 
     Returns:
         Tdict: `Tdict`ified version of `x`.
     """
     if isinstance(x, abc.Mapping):
-        return Tdict({k: tdictify(v, through) for k, v in x.items()})
+        if isinstance(x, Tdict):
+            # noinspection PyProtectedMember
+            deep = x._deep
+        shallow_map = vars(x) if isinstance(x, Tdict) else x
+        return Tdict({k: tdictify(v, through, deep=deep) for k, v in shallow_map.items()}, deep=deep)
     if through:
         for t in through:
             if isinstance(x, t):
-                # noinspection PyTypeChecker
-                return t(tdictify(v, through) for v in x)
+                return t(tdictify(v, through, deep=deep) for v in x)
     return x
