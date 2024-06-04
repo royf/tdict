@@ -75,7 +75,8 @@ class Tdict(abc.MutableMapping):
     @DynamicAttrs
     """
 
-    def __new__(cls, *maps, deep=True, **attr):
+    # noinspection PyMethodParameters
+    def __new__(_cls, *maps, deep=True, **attr):
         return super().__new__(type('Tdict', (Tdict,), {'_deep': deep}))
 
     def __init__(self, *maps, deep=True, **attr):
@@ -181,10 +182,16 @@ class Tdict(abc.MutableMapping):
     def set_deep(self, deep):
         type(self)._deep = deep
 
-    def as_deep(self, deep):
+    def as_deep(self, deep=True):
         d = self.copy()
         d.set_deep(deep)
         return d
+
+    def as_shallow(self, deep=False):
+        return self.as_deep(deep)
+
+    def as_dict(self):
+        return vars(self)
 
     def keys(self, deep=None):
         """
