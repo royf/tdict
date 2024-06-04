@@ -1,5 +1,6 @@
 import operator
 from collections import abc
+from functools import partial
 from typing import Mapping
 from typing import Sequence
 
@@ -77,7 +78,10 @@ class Tdict(abc.MutableMapping):
 
     # noinspection PyMethodParameters
     def __new__(_cls, *maps, deep=True, **attr):
-        return super().__new__(type('Tdict', (Tdict,), {'_deep': deep}))
+        return super().__new__(type('Tdict', (Tdict,), {
+            '_deep': deep,
+            '__reduce__': lambda self: (partial(_cls.__new__, _cls, deep=deep), (), self.__dict__),
+        }))
 
     def __init__(self, *maps, deep=True, **attr):
         """
