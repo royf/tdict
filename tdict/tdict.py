@@ -78,7 +78,7 @@ class Tdict(abc.MutableMapping):
 
     # noinspection PyMethodParameters
     def __new__(_cls, *maps, deep=True, **attr):
-        return super().__new__(type('Tdict', (Tdict,), {
+        return super().__new__(type(_cls.__name__, (_cls,), {
             '_deep': deep,
             '__reduce__': lambda self: (partial(_cls.__new__, _cls, deep=deep), (), self.__dict__),
         }))
@@ -261,7 +261,7 @@ class Tdict(abc.MutableMapping):
         Returns:
             str: String representation of `self`.
         """
-        return f'Tdict({", ".join(f"{k}={v!r}" for k, v in vars(self).items())})'
+        return f'{type(self).__name__}({", ".join(f"{k}={v!r}" for k, v in vars(self).items())})'
 
     def __contains__(self, k):
         """
@@ -295,7 +295,7 @@ class Tdict(abc.MutableMapping):
         Returns:
             Tdict: Deep copy of `self`.
         """
-        res = Tdict(deep=self._deep)
+        res = type(self)(deep=self._deep)
         for k, v in vars(self).items():
             if exclude is not None and k in exclude:
                 continue
