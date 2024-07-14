@@ -262,12 +262,12 @@ class Tdict(abc.MutableMapping):
         for k, d in key.items():
             self_default = ... if set_default else False
             try:
-                res[k] = type(self).__getitem__(self, k, self_default, d)
+                vars(res)[k] = type(self).__getitem__(self, k, self_default, d)
             except KeyError:
                 if get_default or len(key) == 1:
-                    res[k] = d
+                    vars(res)[k] = d
         if len(key) == 1:
-            return next(iter(res.values()))
+            return next(iter(res.values(deep=False)))
         else:
             return res
 
