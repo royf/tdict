@@ -74,14 +74,14 @@ class Tdict(abc.MutableMapping):
     @DynamicAttrs
     """
 
-    def __new__(cls, *maps, **attr):
+    def __new__(cls, /, *maps, **attr):
         subcls = type(cls.__name__, (cls,), {
             '__new__': cls.new_with,
             '__reduce__': lambda self: (cls.init_with, (type(self).DEEP, type(self).DEFAULT), vars(self)),
         })
         return super().__new__(subcls)  # type: ignore
 
-    def __init__(self, *maps, **attr):
+    def __init__(self, /, *maps, **attr):
         """
 
         Args:
@@ -104,7 +104,7 @@ class Tdict(abc.MutableMapping):
     DEFAULT = None
 
     @classmethod
-    def new_with(cls, cls_, *args, **kwargs):
+    def new_with(cls, cls_, /, *args, **kwargs):
         d = cls.__new__(cls)
         cls.__init__(d.with_deep(cls_.DEEP).with_default(cls_.DEFAULT), *args, **kwargs)  # type: ignore
         return d
@@ -258,7 +258,7 @@ class Tdict(abc.MutableMapping):
         key.update(kwargs)
         if get_default is None:
             get_default = default is not None
-        res = Tdict()
+        res = type(self)()
         d = None
         for k, d in key.items():
             self_default = ... if set_default else False
