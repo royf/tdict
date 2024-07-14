@@ -1,5 +1,7 @@
 import operator
 from collections import abc
+from typing import Iterable
+from typing import Mapping
 
 
 class Tdict(abc.MutableMapping):
@@ -103,21 +105,21 @@ class Tdict(abc.MutableMapping):
 
     @classmethod
     def new_with(cls, cls_, *args, **kwargs):
-        d = cls.__new__(cls).with_deep(cls_.DEEP).with_default(cls_.DEFAULT)
-        cls.__init__(d, *args, **kwargs)
+        d = cls.__new__(cls)
+        cls.__init__(d.with_deep(cls_.DEEP).with_default(cls_.DEFAULT), *args, **kwargs)  # type: ignore
         return d
 
     @classmethod
     def init_with(cls, deep, default):
         return cls().with_deep(deep).with_default(default)
 
-    def __getitem__(self, k, def_default=True, default=None):
+    def __getitem__(self, k, self_default=True, default=None):
         """
 
         Args:
             k (str | tuple): Item key. May be a `tuple` for deep access. Creates nested `Tdict`s if needed for default.
-            def_default (bool, optional): `True` for `self`'s default, `False` for the arg default, None for neither.
-            default: Default value to set and get if `cls_default` is `False`.
+            self_default (bool): `True` for `self`'s default, `Ellipsis` for the arg default, `False` for neither.
+            default: Default value to set and get if `self_default` is `Ellipsis`.
 
         Returns:
             Item value.
@@ -125,34 +127,39 @@ class Tdict(abc.MutableMapping):
         Raises:
             KeyError: Key path is missing and no default exists.
         """
+        if self_default is True:
+            use_default = type(self).DEFAULT is not None
+        else:
+            use_default = self_default is ...
         try:
             if isinstance(k, tuple):
                 if len(k) == 0:
                     return self
                 elif len(k) == 1:
-                    return type(self).__getitem__(self, k[0], def_default, default)
+                    return type(self).__getitem__(self, k[0], self_default, default)
                 elif k[0] not in vars(self):
-                    if def_default is None:
-                        raise KeyError(k[0])
-                    else:
+                    if use_default:
                         d = type(self)()
                         vars(self)[k[0]] = d
-                        return type(d).__getitem__(d, k[1:], def_default, default)
+                        return type(d).__getitem__(d, k[1:], self_default, default)
+                    else:
+                        raise KeyError(k[0])
                 else:
                     d = vars(self)[k[0]]
                     if isinstance(d, Tdict):
-                        return type(d).__getitem__(d, k[1:], def_default, default)
+                        return type(d).__getitem__(d, k[1:], self_default, default)
                     else:
                         raise KeyError(k[0])
             elif k not in vars(self):
-                if def_default is None:
-                    raise KeyError(k)
-                elif def_default:
-                    v = type(self).DEFAULT()
+                if use_default:
+                    if self_default is True:
+                        v = type(self).DEFAULT()
+                    else:
+                        v = default
+                    vars(self)[k] = v
+                    return v
                 else:
-                    v = default
-                vars(self)[k] = v
-                return v
+                    raise KeyError(k)
             else:
                 return vars(self)[k]
         except KeyError:
@@ -219,52 +226,95 @@ class Tdict(abc.MutableMapping):
         except KeyError:
             raise KeyError(k) from None
 
-    def access_default(self, get=True, k=None, default=None, /, **kwargs):
+    def access_default(self, key=None, default=None, get_default=None, set_default=False, /, **kwargs):
         """
+        Get all the values for keys in `key` and `kwargs`, or defaults if missing.
+        If `key` is a single key (`str` or `tuple` for deep access) and no `kwargs` are given,
+            then `default` is returned if its value is missing.
+        If `key` is multiple keys (`set` or `Mapping`), then a `Tdict` is returned.
+            If `get_default` is `False`, missing values are omitted from the `Tdict` (which could make it size 0 or 1).
+            Otherwise, defaults are taken from the default values given in `key`, or as `default` if `key` is a `set`.
+        If `set_default` is `True`, default values are also set in `self`, so none end up missing.
+            For `tuple` keys, `Tdict` paths are created as needed to set the default values.
 
         Args:
-            get (bool): Whether to also set default or just get it.
-            k (str | tuple): Item key. May be a `tuple` for deep access.
-            default: Item value to get if missing.
-            **kwargs: If `k` and `default` are `None`, a single item used for `{k: default}`.
+            key (str | tuple | set | Mapping): Item key(s). Can be a `Mapping` of keys to their defaults.
+            default: Default value for missing key(s). Default: None for single key, omit missing of multiple keys.
+                Ignored if `k` is a `Mapping` providing each key's default.
+            get_default (bool, optional): Whether to return missing keys with default values.
+                Default: `True` if `default` is not `None`.
+            set_default (bool): Whether to also set default values for missing keys.
+            **kwargs: additional keys and their defaults.
 
-        Raises:
-            ValueError: Multiple keys provided.
+        Returns:
+            The value (or `default`) of a single `key`, or `Tdict` with values of multiple keys.
         """
-        try:
-            if len(kwargs) == 1 and k is None and default is None:
-                k, default = next(iter(kwargs.items()))
-            elif len(kwargs) > 1:
-                raise ValueError("get takes a single key")
-            return type(self).__getitem__(self, k, use_default=None if get else 'arg', default=default)
-        except KeyError:
-            return default
+        single_key = False
+        if key is None:
+            key = {}
+        elif isinstance(key, set):
+            key = {k: default for k in key}
+        elif not isinstance(key, abc.Mapping):
+            key = {key: default}
+            if len(kwargs) == 0:
+                single_key = True
+        key.update(kwargs)
+        if get_default is None:
+            get_default = default is not None
+        res = Tdict()
+        for k, d in key.items():
+            self_default = ... if set_default else False
+            try:
+                res[k] = type(self).__getitem__(self, k, self_default, d)
+            except KeyError:
+                if get_default or single_key:
+                    res[k] = d
+        if single_key:
+            return next(iter(res.values()))
+        else:
+            return res
 
-    def get(self, k=None, default=None, /, **kwargs):
+    def get(self, key=None, default=None, get_default=None, /, **kwargs):
         """
+        Get all the values for keys in `key` and `kwargs`, or defaults if missing.
+        If `key` is a single key (`str` or `tuple` for deep access) and no `kwargs` are given,
+            then `default` is returned if its value is missing.
+        If `key` is multiple keys (`set` or `Mapping`), then a `Tdict` is returned.
+            If `get_default` is `False`, missing values are omitted from the `Tdict` (which could make it size 0 or 1).
+            Otherwise, defaults are taken from the default values given in `key`, or as `default` if `key` is a `set`.
 
         Args:
-            k (str | tuple): Item key. May be a `tuple` for deep access.
-            default: Item value to get if missing.
-            **kwargs: If `k` and `default` are `None`, a single item used for `{k: default}`.
+            key (str | tuple | set | Mapping): Item key(s). Can be a `Mapping` of keys to their defaults.
+            default: Default value for missing key(s). Default: None for single key, omit missing of multiple keys.
+                Ignored if `k` is a `Mapping` providing each key's default.
+            get_default (bool, optional): Whether to return missing keys with default values.
+            **kwargs: additional keys and their defaults.
 
-        Raises:
-            ValueError: Multiple keys provided.
+        Returns:
+            The value (or `default`) of a single `key`, or `Tdict` with values of multiple keys.
         """
-        return self.access_default(True, k, default, **kwargs)
+        return self.access_default(key, default, get_default, **kwargs)
 
-    def setdefault(self, k=None, default=None, /, **kwargs):
+    def setdefault(self, key=None, default=None, /, **kwargs):
         """
+        Get all the values for keys in `key` and `kwargs`, or defaults if missing.
+        If `key` is a single key (`str` or `tuple` for deep access) and no `kwargs` are given,
+            then `default` is returned if its value is missing.
+        If `key` is multiple keys (`set` or `Mapping`), then a `Tdict` is returned.
+            Defaults are taken from the default values given in `key`, or as `default` if `key` is a `set`.
+        Missing keys also have their default values set in `self`.
+            For `tuple` keys, `Tdict` paths are created as needed to set the default values.
 
         Args:
-            k (str | tuple): Item key. May be a `tuple` for deep access, which creates nested `Tdict`s as needed.
-            default: Item value to set and get if missing.
-            **kwargs: If `k` and `default` are `None`, a single item used for `{k: default}`.
+            key (str | tuple | set | Mapping): Item key(s). Can be a `Mapping` of keys to their defaults.
+            default: Default value for missing key(s). Default: None.
+                Ignored if `k` is a `Mapping` providing each key's default.
+            **kwargs: additional keys and their defaults.
 
-        Raises:
-            ValueError: Multiple keys provided.
+        Returns:
+            The value (or `default`) of a single `key`, or `Tdict` with values of multiple keys.
         """
-        return self.access_default(False, k, default, **kwargs)
+        return self.access_default(key, default, None, True, **kwargs)
 
     def as_dict(self):
         """
@@ -396,7 +446,7 @@ class Tdict(abc.MutableMapping):
 
         Args:
             deep (bool, optional): Whether to copy recursively. Unlike `copy.deepcopy`, only goes through `Tdict`s.
-            exclude (abc.Iterable): Iterable of keys to exclude. Default: no keys excluded.
+            exclude (Iterable): Iterable of keys to exclude. Default: no keys excluded.
 
         Returns:
             Tdict: Copy of `self`.
@@ -569,7 +619,7 @@ def tdictify(x, through=None, deep=True, default=None):
 
     Args:
         x: The object to `Tdict`ify.
-        through (Sequence[Type]): list of types through which to deep-copy and `Tdict`ify; e.g., `[list, tuple]`.
+        through (Iterable): list of types through which to deep-copy and `Tdict`ify; e.g., `[list, tuple]`.
         deep (bool): whether the constructed Tdict iterates keys, values, and items recursively by default.
         default: default value to set and return, when getting a missing key.
 
