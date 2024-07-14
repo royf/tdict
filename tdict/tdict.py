@@ -93,7 +93,7 @@ class Tdict(abc.MutableMapping):
         for m in maps:
             shallow_map = vars(m) if isinstance(m, Tdict) else m
             for k, v in shallow_map.items():
-                if isinstance(v, abc.Mapping):
+                if isinstance(v, abc.Mapping) and not isinstance(v, Tdict):
                     item = vars(self).setdefault(k, type(self)())
                     type(item).update(item, v)
                 else:
@@ -624,9 +624,8 @@ def tdictify(x, through=None, deep=True, default=None):
     Returns:
         Tdict: `Tdict`ified version of `x`.
     """
-    if isinstance(x, abc.Mapping):
-        shallow_map = vars(x) if isinstance(x, Tdict) else x
-        d = Tdict({k: tdictify(v, through, deep, default) for k, v in shallow_map.items()})
+    if isinstance(x, abc.Mapping) and not isinstance(x, Tdict):
+        d = Tdict({k: tdictify(v, through, deep, default) for k, v in x.items()})
         return type(d).with_default(type(d).with_deep(d, deep), default)
     if through:
         for t in through:
