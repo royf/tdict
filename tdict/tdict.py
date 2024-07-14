@@ -259,7 +259,6 @@ class Tdict(abc.MutableMapping):
         if get_default is None:
             get_default = default is not None
         res = type(self)()
-        d = None
         for k, d in key.items():
             self_default = ... if set_default else False
             try:
@@ -268,7 +267,7 @@ class Tdict(abc.MutableMapping):
                 if get_default or len(key) == 1:
                     res[k] = d
         if len(key) == 1:
-            return next(iter(key.values()))
+            return next(iter(res.values()))
         else:
             return res
 
