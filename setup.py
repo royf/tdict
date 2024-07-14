@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='tdict',
-    version='0.4.1',
+    version='0.4.2',
     packages=['tdict'],
     url='https://github.com/royf/tdict',
     license='MIT',

@@ -249,28 +249,26 @@ class Tdict(abc.MutableMapping):
         Returns:
             The value (or `default`) of a single `key`, or `Tdict` with values of multiple keys.
         """
-        single_key = False
         if key is None:
             key = {}
         elif isinstance(key, set):
             key = {k: default for k in key}
         elif not isinstance(key, abc.Mapping):
             key = {key: default}
-            if len(kwargs) == 0:
-                single_key = True
         key.update(kwargs)
         if get_default is None:
             get_default = default is not None
         res = Tdict()
+        d = None
         for k, d in key.items():
             self_default = ... if set_default else False
             try:
                 res[k] = type(self).__getitem__(self, k, self_default, d)
             except KeyError:
-                if get_default or single_key:
+                if get_default or len(key) == 1:
                     res[k] = d
-        if single_key:
-            return next(iter(res.values()))
+        if len(key) == 1:
+            return d
         else:
             return res
 
