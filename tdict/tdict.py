@@ -268,7 +268,7 @@ class Tdict(abc.MutableMapping):
                 if get_default or len(key) == 1:
                     res[k] = d
         if len(key) == 1:
-            return d
+            return next(iter(key.values()))
         else:
             return res
 
