@@ -241,17 +241,17 @@ class Tdict(abc.MutableMapping):
         Get all the values for keys in `key` and `kwargs`, or defaults if missing.
         If a single key (`str` or `tuple` for deep access) is given across `key` and `kwargs`,
             then `default` is returned if its value is missing.
-        If multiple keys (`Sequence` or `Mapping`) or no keys are given, then a `Tdict` is returned.
+        If multiple keys (`MutableSequence` or `MutableMapping`) or no keys are given, then a `Tdict` is returned.
             If `get_default` is `False`, missing values are omitted from the `Tdict` (which could make it size 0 or 1).
-            Otherwise, defaults are taken from the values of a `Mapping` `key` or as `default` if `key` is a `Sequence`.
+            Otherwise, defaults are the `MutableMapping` values or `default` if `key` is a `MutableSequence`.
             `get_default` defaults to omitting missing values whose default is `None`.
         If `set_default` is `True`, default values are also set in `self`, so none end up missing.
             For `tuple` keys, `Tdict` paths are created as needed to set the default values.
 
         Args:
-            key (str | tuple | Sequence | Mapping): Item key(s). Can be a `Mapping` of keys to their defaults.
+            key (str | tuple | MutableSequence | MutableMapping): Item key(s), possibly mapping to their defaults.
             default: Default value for missing key(s). Default: None for single key, omit missing of multiple keys.
-                Ignored if `k` is a `Mapping` providing each key's default.
+                Ignored if `k` is a `MutableMapping` providing each key's default.
             get_default (bool, optional): Whether to return missing keys with default values.
                 Default: `True` if `default` is not `None`.
             set_default (bool): Whether to also set default values for missing keys.
@@ -262,9 +262,9 @@ class Tdict(abc.MutableMapping):
         """
         if key is None:
             key = {}
-        elif isinstance(key, abc.Sequence):
+        elif isinstance(key, abc.MutableSequence):
             key = {k: default for k in key}
-        elif not isinstance(key, abc.Mapping):
+        elif not isinstance(key, abc.MutableMapping):
             key = {key: default}
         key.update(kwargs)
         res = type(self)()
@@ -285,15 +285,15 @@ class Tdict(abc.MutableMapping):
         Get all the values for keys in `key` and `kwargs`, or defaults if missing.
         If a single key (`str` or `tuple` for deep access) is given across `key` and `kwargs`,
             then `default` is returned if its value is missing.
-        If multiple keys (`Sequence` or `Mapping`) or no keys are given, then a `Tdict` is returned.
+        If multiple keys (`MutableSequence` or `MutableMapping`) or no keys are given, then a `Tdict` is returned.
             If `get_default` is `False`, missing values are omitted from the `Tdict` (which could make it size 0 or 1).
-            Otherwise, defaults are taken from the values of a `Mapping` `key` or as `default` if `key` is a `Sequence`.
+            Otherwise, defaults are the `MutableMapping` values or `default` if `key` is a `MutableSequence`.
             `get_default` defaults to omitting missing values whose default is `None`.
 
         Args:
-            key (str | tuple | Sequence | Mapping): Item key(s). Can be a `Mapping` of keys to their defaults.
+            key (str | tuple | MutableSequence | MutableMapping): Item key(s), possibly mapping to their defaults.
             default: Default value for missing key(s). Default: None for single key, omit missing of multiple keys.
-                Ignored if `k` is a `Mapping` providing each key's default.
+                Ignored if `k` is a `MutableMapping` providing each key's default.
             get_default (bool, optional): Whether to return missing keys with default values.
             **kwargs: additional keys and their defaults.
 
@@ -307,13 +307,13 @@ class Tdict(abc.MutableMapping):
         Get all the values for keys in `key` and `kwargs`, or defaults if missing.
         If a single key (`str` or `tuple` for deep access) is given across `key` and `kwargs`,
             then `default` is returned if its value is missing.
-        If multiple keys (`Sequence` or `Mapping`) or no keys are given, then a `Tdict` is returned.
-            Defaults are taken from the values of a `Mapping` `key` or as `default` if `key` is a `Sequence`.
+        If multiple keys (`MutableSequence` or `MutableMapping`) or no keys are given, then a `Tdict` is returned.
+            Defaults are the `MutableMapping` values or `default` if `key` is a `MutableSequence`.
 
         Args:
-            key (str | tuple | Sequence | Mapping): Item key(s). Can be a `Mapping` of keys to their defaults.
+            key (str | tuple | MutableSequence | MutableMapping): Item key(s), possibly mapping to their defaults.
             default: Default value for missing key(s). Default: None for single key, omit missing of multiple keys.
-                Ignored if `k` is a `Mapping` providing each key's default.
+                Ignored if `k` is a `MutableMapping` providing each key's default.
             **kwargs: additional keys and their defaults.
 
         Returns:
@@ -326,16 +326,15 @@ class Tdict(abc.MutableMapping):
         Get all the values for keys in `key` and `kwargs`, or defaults if missing.
         If a single key (`str` or `tuple` for deep access) is given across `key` and `kwargs`,
             then `default` is returned if its value is missing.
-        If multiple keys (`Sequence` or `Mapping`) or no keys are given, then a `Tdict` is returned.
-            If `get_default` is `False`, missing values are omitted from the `Tdict` (which could make it size 0 or 1).
-            Defaults are taken from the values of a `Mapping` `key` or as `default` if `key` is a `Sequence`.
+        If multiple keys (`MutableSequence` or `MutableMapping`) or no keys are given, then a `Tdict` is returned.
+            Defaults are the `MutableMapping` values or `default` if `key` is a `MutableSequence`.
         Missing keys also have their default values set in `self`.
             For `tuple` keys, `Tdict` paths are created as needed to set the default values.
 
         Args:
-            key (str | tuple | Sequence | Mapping): Item key(s). Can be a `Mapping` of keys to their defaults.
+            key (str | tuple | MutableSequence | MutableMapping): Item key(s), possibly mapping to their defaults.
             default: Default value for missing key(s). Default: None.
-                Ignored if `k` is a `Mapping` providing each key's default.
+                Ignored if `k` is a `MutableMapping` providing each key's default.
             **kwargs: additional keys and their defaults.
 
         Returns:
