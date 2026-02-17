@@ -40,8 +40,8 @@ class TestClassAttributes(unittest.TestCase):
         with self.assertRaises(KeyError) as e:
             d1.dd.append(4)
         self.assertIsInstance(e.exception, KeyError)
-        d2 = d1.with_shallow()
-        d3 = d1.with_default_factory(list)
+        d2 = d1.set_shallow()
+        d3 = d1.set_default_factory(list)
         self.assertIs(d1, d2)
         self.assertIs(d1, d3)
         self.assertFalse(d1.DEEP)
@@ -97,8 +97,8 @@ class TestGet(unittest.TestCase):
 
     def test_deep_get(self):
         d = Tdict(
-            aa=Tdict(bb=Tdict(cc=3), dd=Tdict().with_default_factory(int)),
-            ee=Tdict(ff=Tdict()).with_default_factory(int))
+            aa=Tdict(bb=Tdict(cc=3), dd=Tdict().set_default_factory(int)),
+            ee=Tdict(ff=Tdict()).set_default_factory(int))
         self.assertIs(d[()], d)
         self.assertEqual(d['aa', 'bb', 'cc'], 3)
         with self.assertRaises(KeyError) as e:

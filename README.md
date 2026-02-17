@@ -49,9 +49,9 @@ print(d)
 
 - `d.DEEP` (default: `True`)
 - `d.DEFAULT_FACTORY` (default: `None`)
-- `with_deep(self, deep=True)`
-- `with_shallow(self, deep=False)`
-- `with_default_factory(self, default_factory)`
+- `set_deep(self, deep=True)`
+- `set_shallow(self, deep=False)`
+- `set_default_factory(self, default_factory)`
 
 Because the items of a `Tdict` can be accessed as if they were instance attributes, a `Tdict` cannot have instance attributes.
 However, a mechanism akin to instance attributes is needed to modify the behavior of some methods whose signature cannot be changed (such as `get` and `keys`).
@@ -59,7 +59,7 @@ As a workaround, the current implementation uses class attributes for these woul
 This implies that `isinstance(d, Tdict)` should always be used for type checking, as `type(d) == Tdict` and `type(d1) == type(d2)` are always False.
 
 The two builtin attributes are `DEEP` and `DEFAULT_FACTORY`, and their semantics are explained below for the methods they affect.
-These attributes should not be set directly, but through the in-place setters `with_deep`, `with_shallow`, and `with_default_factory`.
+These attributes should not be set directly, but through the in-place setters `set_deep`, `set_shallow`, and `set_default_factory`.
 When constructing a new `Tdict` from another's constructor, e.g. `type(d)()`, these builtin attributes are initialized to the same value.
 
 It is possible to access builtin and user-defined class attributes directly via `type(d).DEEP` etc.
@@ -77,7 +77,7 @@ print(d.get(['DEEP', 'DEFAULT_FACTORY', 'cc']))
 d.DEEP = 'this is an item, not a class attribute'
 d.DEFAULT_FACTORY = 'probably not what you intended to do'
 d.cc = 3
-d.with_shallow().with_default_factory(list)
+d.set_shallow().set_default_factory(list)
 # Tdict(aa=Tdict(bb=2), DEEP='this is an item, not a class attribute', DEFAULT_FACTORY='probably not what you intended to do', cc=3)
 type(d).cc = 4
 print(type(d).DEEP, type(d).DEFAULT_FACTORY, type(d).cc)
@@ -233,7 +233,7 @@ The `Tdict` tree iterator is over `keys`, while `len` counts leaf `values` (with
 It recurses over the `map_tree` through each `Mapping` node, copying it as a `Tdict` node, or as a new object of its own type if it is already a `Tdict`.
 It also recurses through nodes with type in `through` (e.g. `through=[list, tuple]`) and copies them, until it reaches values that are neither a `Mapping` nor of a type in `through`.
 For each such leaf, `cast` sets its value to `op(val)` of its input `val`, or to `val` if `op` is `None`.
-To set the `DEEP` and `DEFAULT` of the new `Tdict` tree, its `cls` can be set accordingly, e.g. `Tdict().with_deep(False).with_default(list).cast({'a': [{'b': 2, 'c': 3}]}, [list])`.
+To set the `DEEP` and `DEFAULT` of the new `Tdict` tree, its `cls` can be set accordingly, e.g. `Tdict().set_deep(False).set_default(list).cast({'a': [{'b': 2, 'c': 3}]}, [list])`.
 
 
 ## Copying and excluding

@@ -8,5 +8,5 @@ setup(
     license='MIT',
     author='Roy Fox',
     author_email='roy.d.fox@gmail.com',
-    description='`Tdict` is a tree-structured mapping for easy handling of configurations and results'
+    description='Tdict is a tree-structured mapping for easy handling of configurations and results.'
 )

@@ -42,14 +42,14 @@ class Tdict(abc.MutableMapping):
     @classmethod
     def new_with(cls, cls_, /, *args, **kwargs):
         d = cls.__new__(cls)
-        cls.__init__(d.with_deep(cls_.DEEP).with_default_factory(cls_.DEFAULT_FACTORY), *args, **kwargs)  # type: ignore
+        cls.__init__(d.set_deep(cls_.DEEP).set_default_factory(cls_.DEFAULT_FACTORY), *args, **kwargs)  # type: ignore
         return d
 
     @classmethod
     def init_with(cls, deep, default_factory):
-        return cls().with_deep(deep).with_default_factory(default_factory)
+        return cls().set_deep(deep).set_default_factory(default_factory)
 
-    def with_deep(self, deep=True):
+    def set_deep(self, deep=True):
         """
 
         Args:
@@ -61,7 +61,7 @@ class Tdict(abc.MutableMapping):
         type(self).DEEP = deep
         return self
 
-    def with_shallow(self, deep=False):
+    def set_shallow(self, deep=False):
         """
 
         Args:
@@ -73,7 +73,7 @@ class Tdict(abc.MutableMapping):
         type(self).DEEP = deep
         return self
 
-    def with_default_factory(self, default_factory):
+    def set_default_factory(self, default_factory):
         """
 
         Args:
@@ -464,32 +464,37 @@ class Tdict(abc.MutableMapping):
             return map_tree
         return op(map_tree)
 
-    def copy(self, deep=True, exclude=None, prefix=()):
+    def copy(self, deep=None, exclude=None):
         """
 
         Args:
             deep (bool or optional): Whether to copy recursively.
                 Unlike `copy.deepcopy`, only goes through `Tdict` nodes.
+                Default: respects each node's DEEP attribute.
             exclude (Iterable or optional): `Iterable` of keys to exclude.
                 Default: no keys excluded.
-            prefix (tuple or optional): the prefix of `self` in the excluded keys for deep copy (to support recursion).
-                Default: copy is called on the root.
 
         Returns:
             Tdict: Copy of `self`.
         """
+        if exclude is not None:
+            exclude = set(ex if isinstance(ex, tuple) else (ex,) for ex in exclude)
         res = type(self)()
         if deep or (deep is None and type(self).DEEP):
             for k, v in vars(self).items():
-                if exclude is not None and prefix + (k,) in exclude:
+                if exclude is not None and (k,) in exclude:
                     continue
                 if isinstance(v, Tdict):
-                    vars(res)[k] = type(v).copy(v, deep, exclude, prefix + (k,))
+                    if exclude is None:
+                        sub_exclude = None
+                    else:
+                        sub_exclude = set(ex[1:] for ex in exclude if ex[0] == k)
+                    vars(res)[k] = type(v).copy(v, deep, sub_exclude)
                 else:
                     vars(res)[k] = v
         else:
             for k, v in vars(self).items():
-                if exclude is not None and k in exclude:
+                if exclude is not None and (k,) in exclude:
                     continue
                 vars(res)[k] = v
         return res
@@ -618,7 +623,7 @@ class Op(object):
     def __get__(self, obj, objtype=None):
         def apply(self_, other):
             if not self.inplace:
-                self_ = type(self_).copy(self_, deep=True)
+                self_ = type(self_).copy(self_)
             return type(self_).update(self_, other, self.op)
 
         return apply.__get__(obj, objtype)
