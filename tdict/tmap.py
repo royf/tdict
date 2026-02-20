@@ -28,16 +28,16 @@ class Tmap(MutableMapping):
             else:
                 try:
                     if len(key) == 1:
-                        return super().__getitem__(key[0])
+                        return super()[key[0]]
                     else:
-                        child = super().__getitem__(key[0])
+                        child = super()[key[0]]
                         if not isinstance(child, Tmap):
                             raise KeyError(key)
-                        return type(child).__getitem__(child, key[1:])
+                        return child[key[1:]]
                 except KeyError:
                     raise KeyError(key) from None
         else:
-            return super().__getitem__(key)
+            return super()[key]
 
         # Iterative version:
         # try:
@@ -72,16 +72,16 @@ class Tmap(MutableMapping):
             else:
                 try:
                     if len(key) == 1:
-                        super().__setitem__(key[0], val)
+                        super()[key[0]] = val
                     else:
-                        child = super().__getitem__(key[0])
+                        child = super()[key[0]]
                         if not isinstance(child, Tmap):
                             raise KeyError(key)
-                        type(child).__setitem__(child, key[1:], val)
+                        child[key[1:]] = val
                 except KeyError:
                     raise KeyError(key) from None
         else:
-            super().__setitem__(key, val)
+            super()[key] = val
 
         # Iterative version:
         # try:
@@ -121,16 +121,16 @@ class Tmap(MutableMapping):
             else:
                 try:
                     if len(key) == 1:
-                        super().__delitem__(key[0])
+                        del super()[key[0]]
                     else:
-                        child = super().__getitem__(key[0])
+                        child = super()[key[0]]
                         if not isinstance(child, Tmap):
                             raise KeyError(key)
-                        type(child).__delitem__(child, key[1:])
+                        del child[key[1:]]
                 except KeyError:
                     raise KeyError(key) from None
         else:
-            super().__delitem__(key)
+            del super()[key]
 
         # Iterative version:
         # try:
@@ -170,6 +170,11 @@ class Tmap(MutableMapping):
             else:
                 yield k
 
+    def copy(self):
+        res = type(self)()
+        res.update(self)
+        return res
+
     def merge(self, other, op):
         """
         Update items from `other`, applying the binary `op` to value pairs from `self` and `other`, in this order.
@@ -181,27 +186,23 @@ class Tmap(MutableMapping):
         Args:
             other (Tmap): `Tmap` to merge from.
             op ((Any, Any) -> Any): Merge operator, applied as `op(self_val, other_val)`.
-
-        Returns:
-            Tmap: Updated `Tmap`.
         """
         if isinstance(other, Tmap):
             for k, other_child in super(Tmap, other).items():
-                if super().__contains__(k):
-                    self_child = super().__getitem__(k)
+                if k in super():
+                    self_child = super()[k]
                     if isinstance(self_child, Tmap):
-                        new_child = type(self_child).merge(self_child, other_child, op)
+                        self_child.merge(other_child, op)
+                        new_child = self_child
                     elif isinstance(other_child, Tmap):
-                        new_child = type(other_child)().update((
-                            (k_, op(self_child, v_))
-                            for k_, v_ in type(other_child).items(other_child)))
+                        new_child = type(other_child)()
+                        new_child.update(((k_, op(self_child, v_)) for k_, v_ in other_child.items()))
                     else:
                         new_child = op(self_child, other_child)
                 elif isinstance(other_child, Tmap):
-                    new_child = type(other_child)().update(other_child)
+                    new_child = other_child.copy()
                 else:
                     new_child = other_child
-                super().__setitem__(k, new_child)
+                super()[k] = new_child
         else:
-            type(self).update(self, ((k, op(v, other)) for k, v in type(self).items(self)))
-        return self
+            self.update(((k, op(v, other)) for k, v in self.items()))

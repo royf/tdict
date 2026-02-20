@@ -21,9 +21,10 @@ class Bunch(MutableMapping):
             **kwargs: Lastly, update items from `kwargs`.
         """
         super().__init__()
+        super().__setattr__('d', {})
         for m in maps:
-            type(self).update(self, m)
-        type(self).update(self, kwargs)
+            self.d.update(m)
+        self.d.update(kwargs)
 
     def __str__(self):
         """
@@ -31,7 +32,7 @@ class Bunch(MutableMapping):
         Returns:
             str: Informal string representation.
         """
-        return f'{type(self).__name__}({", ".join(f"{k}={v}" for k, v in vars(self).items())})'
+        return f'{type(self).__name__}({", ".join(f"{k}={v}" for k, v in self.d.items())})'
 
     def __repr__(self):
         """
@@ -40,7 +41,7 @@ class Bunch(MutableMapping):
             str: String representation.
         """
         return f'''{type(self).__name__}({", ".join(
-            f"{k if isinstance(k, str) and k.isidentifier() else repr(k)}={v!r}" for k, v in vars(self).items())})'''
+            f"{k if isinstance(k, str) and k.isidentifier() else repr(k)}={v!r}" for k, v in self.d.items())})'''
 
     def __getitem__(self, key):
         """
@@ -51,10 +52,13 @@ class Bunch(MutableMapping):
         Returns:
             Item value.
         """
-        return vars(self)[key]
+        return self.d[key]
 
     def __getattr__(self, key):
-        return type(self).__getitem__(self, key)
+        try:
+            return self.d[key]
+        except KeyError:
+            raise AttributeError(key) from None
 
     def __setitem__(self, key, val):
         """
@@ -63,10 +67,10 @@ class Bunch(MutableMapping):
             key (str): Item key.
             val: Item value.
         """
-        vars(self)[key] = val
+        self.d[key] = val
 
     def __setattr__(self, key, val):
-        return type(self).__setitem__(self, key, val)
+        self.d[key] = val
 
     def __delitem__(self, key):
         """
@@ -74,7 +78,10 @@ class Bunch(MutableMapping):
         Args:
             key (str): Item key.
         """
-        del vars(self)[key]
+        del self.d[key]
+
+    def __delattr__(self, key):
+        del self.d[key]
 
     def __len__(self):
         """
@@ -82,7 +89,7 @@ class Bunch(MutableMapping):
         Returns:
             int: Number of items.
         """
-        return len(vars(self))
+        return len(self.d)
 
     def __iter__(self):
         """
@@ -90,10 +97,10 @@ class Bunch(MutableMapping):
         Returns:
             Iterator: Key iterator.
         """
-        return iter(vars(self))
+        return iter(self.d)
 
     def copy(self):
-        return type(self)(self)
+        return type(self)(self.d)
 
     def get_items(self, keys):
         """
@@ -107,9 +114,9 @@ class Bunch(MutableMapping):
             Bunch: Mapping of `keys` to their values, optionally with default values if missing.
         """
         if isinstance(keys, Mapping):
-            return Bunch({k: type(self).get(self, k, v) for k, v in keys.items()})
+            return Bunch({k: self.d.get(k, v) for k, v in keys.items()})
         else:
-            return Bunch({k: type(self).__getitem__(self, k) for k in keys if k in self})
+            return Bunch({k: self.d[k] for k in keys if k in self.d})
 
     def set_defaults(self, keys):
         """
@@ -121,7 +128,7 @@ class Bunch(MutableMapping):
         Returns:
             Bunch: Mapping of `keys` to their values, with set default values if missing.
         """
-        return Bunch({k: type(self).setdefault(self, k, v) for k, v in keys.items()})
+        return Bunch({k: self.d.setdefault(k, v) for k, v in keys.items()})
 
     def pop_items(self, keys):
         """
@@ -135,9 +142,19 @@ class Bunch(MutableMapping):
             Bunch: Mapping of `keys` to their popped values, optionally with default values if missing.
         """
         if isinstance(keys, Mapping):
-            return Bunch({k: type(self).pop(self, k, v) for k, v in keys.items()})
+            return Bunch({k: self.d.pop(k, v) for k, v in keys.items()})
         else:
-            return Bunch({k: type(self).__delitem__(self, k) for k in keys if k in self})
+            return Bunch({k: self.d.pop(k) for k in keys if k in self.d})
+
+    def __ixor__(self, keys):
+        """
+        Delete the items for `keys`.
+
+        Args:
+            keys (Iterable[str]): Item keys.
+        """
+        self.pop_items(keys)
+        return self
 
     def __xor__(self, keys):
         """
@@ -149,19 +166,9 @@ class Bunch(MutableMapping):
         Returns:
             A `Bunch` with the same items except those in `keys`.
         """
-        copy = type(self).copy(self)
-        copy ^= keys
-        return copy
-
-    def __ixor__(self, keys):
-        """
-        Delete the items for `keys`.
-
-        Args:
-            keys (Iterable[str]): Item keys.
-        """
-        type(self).pop_items(self, keys)
-        return self
+        res = self.copy()
+        self.pop_items(keys)
+        return res
 
     def merge(self, other, op):
         """
@@ -170,16 +177,12 @@ class Bunch(MutableMapping):
         Args:
             other (Mapping[str, Any]): `Mapping` to merge from.
             op ((Any, Any) -> Any): Merge operator, applied as `op(self_val, other_val)`.
-
-        Returns:
-            Bunch: Updated `Mapping`.
         """
         for k, v in other.items():
-            if k in self:
-                self[k] = op(self[k], v)
+            if k in self.d:
+                self.d[k] = op(self.d[k], v)
             else:
-                self[k] = v
-        return self
+                self.d[k] = v
 
 
 class Op(object):
@@ -189,9 +192,12 @@ class Op(object):
 
     def __get__(self, obj, objtype=None):
         def apply(self_, other):
-            if not self.inplace:
-                self_ = type(self_).copy(self_)
-            return type(self_).merge(self_, other, self.op)
+            if self.inplace:
+                res = self_
+            else:
+                res = self_.copy()
+            res.merge(self_, other, self.op)
+            return res
 
         return apply.__get__(obj, objtype)
 
