@@ -1,8 +1,24 @@
+from abc import ABC
 from collections.abc import Iterator
-from collections.abc import MutableMapping
+from collections.abc import MutableMapping as abcMM
 
 
-class Tmap(MutableMapping):
+class MutableMapping(abcMM, ABC):
+    __contains__ = abcMM.__contains__
+    keys = abcMM.keys
+    items = abcMM.items
+    values = abcMM.values
+    get = abcMM.get
+    __eq__ = abcMM.__eq__
+    __ne__ = abcMM.__ne__
+    pop = abcMM.pop
+    popitem = abcMM.popitem
+    clear = abcMM.clear
+    update = abcMM.update
+    setdefault = abcMM.setdefault
+
+
+class Tmap(MutableMapping, ABC):
     """
     Tree of `Bunch`.
 
@@ -28,33 +44,16 @@ class Tmap(MutableMapping):
             else:
                 try:
                     if len(key) == 1:
-                        return super()[key[0]]
+                        return super().__getitem__(key[0])
                     else:
-                        child = super()[key[0]]
+                        child = super().__getitem__(key[0])
                         if not isinstance(child, Tmap):
                             raise KeyError(key)
                         return child[key[1:]]
                 except KeyError:
                     raise KeyError(key) from None
         else:
-            return super()[key]
-
-        # Iterative version:
-        # try:
-        #     node = self
-        #     if isinstance(key, tuple):
-        #         if len(key) == 0:
-        #             return self
-        #         for k in key[:-1]:
-        #             node = super(Tmap, node).__getitem__(k)
-        #             if not isinstance(node, Tmap):
-        #                 raise KeyError(k)
-        #         leaf_key = key[-1]
-        #     else:
-        #         leaf_key = key
-        #     return super(Tmap, node).__getitem__(leaf_key)
-        # except KeyError:
-        #     raise KeyError(key) from None
+            return super().__getitem__(key)
 
     def __setitem__(self, key, val):
         """
@@ -72,39 +71,20 @@ class Tmap(MutableMapping):
             else:
                 try:
                     if len(key) == 1:
-                        super()[key[0]] = val
+                        super().__setitem__(key[0], val)
                     else:
-                        child = super()[key[0]]
+                        try:
+                            child = super().__getitem__(key[0])
+                        except KeyError:
+                            child = type(self)()
+                            super().__setitem__(key[0], child)
                         if not isinstance(child, Tmap):
                             raise KeyError(key)
                         child[key[1:]] = val
                 except KeyError:
                     raise KeyError(key) from None
         else:
-            super()[key] = val
-
-        # Iterative version:
-        # try:
-        #     node: Tmap = self
-        #     if isinstance(key, tuple):
-        #         if len(key) == 0:
-        #             raise KeyError("cannot set root")
-        #         for k in key[:-1]:
-        #             try:
-        #                 node = super(Tmap, node).__getitem__(k)
-        #             except KeyError:
-        #                 child = type(node)()
-        #                 super(Tmap, node).__setitem__(k, child)
-        #                 node = child
-        #             else:
-        #                 if not isinstance(node, Tmap):
-        #                     raise KeyError(k)
-        #         leaf_key = key[-1]
-        #     else:
-        #         leaf_key = key
-        #     super(Tmap, node).__setitem__(leaf_key, val)
-        # except KeyError:
-        #     raise KeyError(key) from None
+            super().__setitem__(key, val)
 
     def __delitem__(self, key):
         """
@@ -121,33 +101,16 @@ class Tmap(MutableMapping):
             else:
                 try:
                     if len(key) == 1:
-                        del super()[key[0]]
+                        super().__delitem__(key[0])
                     else:
-                        child = super()[key[0]]
+                        child = super().__getitem__(key[0])
                         if not isinstance(child, Tmap):
                             raise KeyError(key)
                         del child[key[1:]]
                 except KeyError:
                     raise KeyError(key) from None
         else:
-            del super()[key]
-
-        # Iterative version:
-        # try:
-        #     node = self
-        #     if isinstance(key, tuple):
-        #         if len(key) == 0:
-        #             raise KeyError("cannot delete root")
-        #         for k in key[:-1]:
-        #             node = super(Tmap, node).__getitem__(k)
-        #             if not isinstance(node, Tmap):
-        #                 raise KeyError(k)
-        #         leaf_key = key[-1]
-        #     else:
-        #         leaf_key = key
-        #     super(Tmap, node).__delitem__(leaf_key)
-        # except KeyError:
-        #     raise KeyError(key) from None
+            super().__delitem__(key)
 
     def __len__(self):
         """
@@ -155,7 +118,7 @@ class Tmap(MutableMapping):
         Returns:
             int: Number of items.
         """
-        return sum(len(v) if isinstance(v, Tmap) else 1 for v in super().values())
+        return sum(1 for _ in iter(self))
 
     def __iter__(self):
         """
@@ -163,12 +126,13 @@ class Tmap(MutableMapping):
         Returns:
             Iterator: Key iterator.
         """
-        for k, v in super().items():
-            if isinstance(v, Tmap):
-                for k_ in iter(v):
+        for k in super().__iter__():
+            child = super().__getitem__(k)
+            if isinstance(child, Tmap):
+                for k_ in iter(child):
                     yield k, *k_
             else:
-                yield k
+                yield k,
 
     def copy(self):
         res = type(self)()
@@ -184,25 +148,28 @@ class Tmap(MutableMapping):
         The result will also have all leaf items in either source that have no prefix leaf items.
 
         Args:
-            other (Tmap): `Tmap` to merge from.
+            other (Tmap | Any): `Tmap` to merge from.
             op ((Any, Any) -> Any): Merge operator, applied as `op(self_val, other_val)`.
         """
         if isinstance(other, Tmap):
-            for k, other_child in super(Tmap, other).items():
-                if k in super():
-                    self_child = super()[k]
+            for k in super(Tmap, other).__iter__():
+                other_child = super(Tmap, other).__getitem__(k)
+                try:
+                    self_child = super().__getitem__(k)
+                except KeyError:
+                    if isinstance(other_child, Tmap):
+                        new_child = other_child.copy()
+                    else:
+                        new_child = other_child
+                else:
                     if isinstance(self_child, Tmap):
                         self_child.merge(other_child, op)
-                        new_child = self_child
+                        continue
                     elif isinstance(other_child, Tmap):
                         new_child = type(other_child)()
                         new_child.update(((k_, op(self_child, v_)) for k_, v_ in other_child.items()))
                     else:
                         new_child = op(self_child, other_child)
-                elif isinstance(other_child, Tmap):
-                    new_child = other_child.copy()
-                else:
-                    new_child = other_child
-                super()[k] = new_child
+                super().__setitem__(k, new_child)
         else:
             self.update(((k, op(v, other)) for k, v in self.items()))

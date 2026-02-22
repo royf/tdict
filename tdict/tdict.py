@@ -1,5 +1,11 @@
+from collections.abc import MutableMapping
+
 from .tmap import Tmap
 
 
-class Tdict(Tmap, dict):
+class MMdict(dict, MutableMapping):
+    pass
+
+
+class Tdict(Tmap, MMdict):
     pass

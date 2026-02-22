@@ -146,6 +146,20 @@ class Bunch(MutableMapping):
         else:
             return Bunch({k: self.d.pop(k) for k in keys if k in self.d})
 
+    def merge(self, other, op):
+        """
+        Update items from `other`, applying the binary `op` to `(self[key], other[key])` for each `key` both contain.
+
+        Args:
+            other (Mapping[str, Any]): `Mapping` to merge from.
+            op ((Any, Any) -> Any): Merge operator, applied as `op(self_val, other_val)`.
+        """
+        for k, v in other.items():
+            if k in self.d:
+                self.d[k] = op(self.d[k], v)
+            else:
+                self.d[k] = v
+
     def __ixor__(self, keys):
         """
         Delete the items for `keys`.
@@ -167,22 +181,8 @@ class Bunch(MutableMapping):
             A `Bunch` with the same items except those in `keys`.
         """
         res = self.copy()
-        self.pop_items(keys)
+        res.pop_items(keys)
         return res
-
-    def merge(self, other, op):
-        """
-        Update items from `other`, applying the binary `op` to `(self[key], other[key])` for each `key` both contain.
-
-        Args:
-            other (Mapping[str, Any]): `Mapping` to merge from.
-            op ((Any, Any) -> Any): Merge operator, applied as `op(self_val, other_val)`.
-        """
-        for k, v in other.items():
-            if k in self.d:
-                self.d[k] = op(self.d[k], v)
-            else:
-                self.d[k] = v
 
 
 class Op(object):
@@ -196,7 +196,7 @@ class Op(object):
                 res = self_
             else:
                 res = self_.copy()
-            res.merge(self_, other, self.op)
+            res.merge(other, self.op)
             return res
 
         return apply.__get__(obj, objtype)
