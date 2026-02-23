@@ -1,30 +1,121 @@
 from abc import ABC
 from collections.abc import Iterator
-from collections.abc import MutableMapping as abcMM
+from collections.abc import MutableMapping
+
+__all__ = ['Tmap']
 
 
-class MutableMapping(abcMM, ABC):
-    __contains__ = abcMM.__contains__
-    keys = abcMM.keys
-    items = abcMM.items
-    values = abcMM.values
-    get = abcMM.get
-    __eq__ = abcMM.__eq__
-    __ne__ = abcMM.__ne__
-    pop = abcMM.pop
-    popitem = abcMM.popitem
-    clear = abcMM.clear
-    update = abcMM.update
-    setdefault = abcMM.setdefault
+class TMutableMapping(MutableMapping, ABC):
+    __contains__ = MutableMapping.__contains__
+    keys = MutableMapping.keys
+    items = MutableMapping.items
+    values = MutableMapping.values
+    get = MutableMapping.get
+    __eq__ = MutableMapping.__eq__
+    __ne__ = MutableMapping.__ne__
+    pop = MutableMapping.pop
+    popitem = MutableMapping.popitem
+    clear = MutableMapping.clear
+    update = MutableMapping.update
+    setdefault = MutableMapping.setdefault
 
 
-class Tmap(MutableMapping, ABC):
+class Tmap(TMutableMapping, ABC):
     """
     Tree of `Bunch`.
 
     Items of `str` keys can be accessed either as attributes or as items.
     The tree can be accessed recursively using `tuple` keys.
     """
+
+    class ShallowView(MutableMapping):
+        def __init__(self, tmap):
+            self._tmap = tmap
+
+        def __getitem__(self, key):
+            return super(Tmap, self._tmap).__getitem__(key)
+
+        def __setitem__(self, key, val):
+            super(Tmap, self._tmap).__setitem__(key, val)
+
+        def __delitem__(self, key):
+            super(Tmap, self._tmap).__delitem__(key)
+
+        def __len__(self):
+            return super(Tmap, self._tmap).__len__()
+
+        def __iter__(self):
+            return super(Tmap, self._tmap).__iter__()
+
+    def as_shallow(self):
+        """
+        Return a shallow view of this `Tmap` node.
+
+        Returns:
+            MutableMapping: A shallow view of this node.
+        """
+        return self.ShallowView(self)
+
+    @classmethod
+    def from_map_tree(cls, map_tree, through=None):
+        """
+        Construct a `Tmap` from a tree of `Mapping`s.
+
+        Args:
+            map_tree (MutableMapping | Any): Tree of `MutableMapping`s to construct from.
+            through (set[type]): Types of non-`MutableMapping` nodes to traverse through when constructing.
+
+        Returns:
+            Tmap: Constructed `Tmap`.
+        """
+        if isinstance(map_tree, MutableMapping):
+            res = cls()
+            for k, v in map_tree.items():
+                res.as_shallow()[k] = cls.from_map_tree(v, through=through)
+        elif through is not None and (t := type(map_tree)) in through:
+            res = t(cls.from_map_tree(v, through=through) for v in map_tree)
+        else:
+            res = map_tree
+        return res
+
+    def to_map_tree(self, shallow_type=dict, through=None):
+        """
+        Convert this `Tmap` to a tree of shallow `MutableMapping`s.
+
+        Args:
+            shallow_type (type): `MutableMapping` type to use for shallow nodes.
+            through (set[type]): Types of non-`Tmap` nodes to traverse through when converting.
+
+        Returns:
+            MutableMapping: Tree of `MutableMapping`s corresponding to this `Tmap`.
+        """
+        res = shallow_type()
+        for k, v in self.as_shallow().items():
+            if isinstance(v, Tmap):
+                res[k] = v.to_map_tree(shallow_type, through)
+            elif through is not None and (t := type(v)) in through:
+                res[k] = t(v.to_map_tree(shallow_type, through) for v in v)
+            else:
+                res[k] = v
+        return res
+
+    def __str__(self):
+        """
+
+        Returns:
+            str: Informal string representation.
+        """
+        return f'{type(self).__name__}({", ".join(f"{k}={v}" for k, v in self.as_shallow().items())})'
+
+    def __repr__(self):
+        """
+
+        Returns:
+            str: String representation.
+        """
+        return f'''{type(self).__name__}({", ".join(
+            f"{k if isinstance(k, str) and k.isidentifier() else repr(k)}={v!r}"
+            for k, v in self.as_shallow().items())})'''
 
     def __getitem__(self, key):
         """
@@ -44,16 +135,16 @@ class Tmap(MutableMapping, ABC):
             else:
                 try:
                     if len(key) == 1:
-                        return super().__getitem__(key[0])
+                        return self.as_shallow()[key[0]]
                     else:
-                        child = super().__getitem__(key[0])
+                        child = self.as_shallow()[key[0]]
                         if not isinstance(child, Tmap):
                             raise KeyError(key)
                         return child[key[1:]]
                 except KeyError:
                     raise KeyError(key) from None
         else:
-            return super().__getitem__(key)
+            return self.as_shallow()[key]
 
     def __setitem__(self, key, val):
         """
@@ -71,20 +162,20 @@ class Tmap(MutableMapping, ABC):
             else:
                 try:
                     if len(key) == 1:
-                        super().__setitem__(key[0], val)
+                        self.as_shallow()[key[0]] = val
                     else:
                         try:
-                            child = super().__getitem__(key[0])
+                            child = self.as_shallow()[key[0]]
                         except KeyError:
                             child = type(self)()
-                            super().__setitem__(key[0], child)
+                            self.as_shallow()[key[0]] = child
                         if not isinstance(child, Tmap):
                             raise KeyError(key)
                         child[key[1:]] = val
                 except KeyError:
                     raise KeyError(key) from None
         else:
-            super().__setitem__(key, val)
+            self.as_shallow()[key] = val
 
     def __delitem__(self, key):
         """
@@ -101,16 +192,16 @@ class Tmap(MutableMapping, ABC):
             else:
                 try:
                     if len(key) == 1:
-                        super().__delitem__(key[0])
+                        del self.as_shallow()[key[0]]
                     else:
-                        child = super().__getitem__(key[0])
+                        child = self.as_shallow()[key[0]]
                         if not isinstance(child, Tmap):
                             raise KeyError(key)
                         del child[key[1:]]
                 except KeyError:
                     raise KeyError(key) from None
         else:
-            super().__delitem__(key)
+            del self.as_shallow()[key]
 
     def __len__(self):
         """
@@ -118,7 +209,7 @@ class Tmap(MutableMapping, ABC):
         Returns:
             int: Number of items.
         """
-        return sum(1 for _ in iter(self))
+        return sum(1 for _ in self)
 
     def __iter__(self):
         """
@@ -126,10 +217,9 @@ class Tmap(MutableMapping, ABC):
         Returns:
             Iterator: Key iterator.
         """
-        for k in super().__iter__():
-            child = super().__getitem__(k)
+        for k, child in self.as_shallow().items():
             if isinstance(child, Tmap):
-                for k_ in iter(child):
+                for k_ in child:
                     yield k, *k_
             else:
                 yield k,
@@ -152,10 +242,9 @@ class Tmap(MutableMapping, ABC):
             op ((Any, Any) -> Any): Merge operator, applied as `op(self_val, other_val)`.
         """
         if isinstance(other, Tmap):
-            for k in super(Tmap, other).__iter__():
-                other_child = super(Tmap, other).__getitem__(k)
+            for k, other_child in other.as_shallow().items():
                 try:
-                    self_child = super().__getitem__(k)
+                    self_child = self.as_shallow()[k]
                 except KeyError:
                     if isinstance(other_child, Tmap):
                         new_child = other_child.copy()
@@ -170,6 +259,6 @@ class Tmap(MutableMapping, ABC):
                         new_child.update(((k_, op(self_child, v_)) for k_, v_ in other_child.items()))
                     else:
                         new_child = op(self_child, other_child)
-                super().__setitem__(k, new_child)
+                self.as_shallow()[k] = new_child
         else:
             self.update(((k, op(v, other)) for k, v in self.items()))

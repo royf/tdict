@@ -1025,5 +1025,489 @@ class TestTmapEmptyAndNested(unittest.TestCase):
         self.assertEqual(t[('level1_50', 'level2_5')], 505)
 
 
+class TestTmapFromMapTree(unittest.TestCase):
+    """Test Tmap.from_map_tree class method."""
+
+    def test_from_map_tree_empty_dict(self):
+        """Test converting empty dict to Tmap."""
+        d = {}
+        t = Tdict.from_map_tree(d)
+        self.assertIsInstance(t, Tdict)
+        self.assertEqual(len(t), 0)
+
+    def test_from_map_tree_flat_dict(self):
+        """Test converting flat dict to Tmap."""
+        d = {'a': 1, 'b': 2, 'c': 3}
+        t = Tdict.from_map_tree(d)
+        self.assertIsInstance(t, Tdict)
+        self.assertEqual(t['a'], 1)
+        self.assertEqual(t['b'], 2)
+        self.assertEqual(t['c'], 3)
+
+    def test_from_map_tree_nested_dict(self):
+        """Test converting nested dict to Tmap."""
+        d = {
+            'level1': {
+                'level2': {
+                    'value': 42
+                }
+            }
+        }
+        t = Tdict.from_map_tree(d)
+        self.assertIsInstance(t, Tdict)
+        self.assertIsInstance(t['level1'], Tdict)
+        self.assertIsInstance(t['level1']['level2'], Tdict)
+        self.assertEqual(t['level1']['level2']['value'], 42)
+
+    def test_from_map_tree_mixed_structure(self):
+        """Test converting mixed structure with scalars and nested dicts."""
+        d = {
+            'scalar': 'value',
+            'number': 123,
+            'nested': {
+                'key1': 'val1',
+                'key2': 'val2'
+            }
+        }
+        t = Tdict.from_map_tree(d)
+        self.assertEqual(t['scalar'], 'value')
+        self.assertEqual(t['number'], 123)
+        self.assertEqual(t['nested']['key1'], 'val1')
+        self.assertEqual(t['nested']['key2'], 'val2')
+
+    def test_from_map_tree_with_lists(self):
+        """Test converting dict with lists."""
+        d = {
+            'items': [1, 2, 3],
+            'nested': {
+                'data': ['a', 'b']
+            }
+        }
+        t = Tdict.from_map_tree(d)
+        self.assertEqual(t['items'], [1, 2, 3])
+        self.assertEqual(t['nested']['data'], ['a', 'b'])
+
+    def test_from_map_tree_deep_nesting(self):
+        """Test converting deeply nested dict."""
+        d = {'a': {'b': {'c': {'d': {'e': 'value'}}}}}
+        t = Tdict.from_map_tree(d)
+        self.assertEqual(t['a']['b']['c']['d']['e'], 'value')
+        self.assertEqual(t[('a', 'b', 'c', 'd', 'e')], 'value')
+
+    def test_from_map_tree_tbunch(self):
+        """Test converting to Tbunch."""
+        d = {
+            'name': 'John',
+            'data': {
+                'age': 30,
+                'city': 'NYC'
+            }
+        }
+        tb = Tbunch.from_map_tree(d)
+        self.assertIsInstance(tb, Tbunch)
+        self.assertEqual(tb.name, 'John')
+        self.assertEqual(tb.data.age, 30)
+        self.assertEqual(tb.data.city, 'NYC')
+
+    def test_from_map_tree_with_through_list(self):
+        """Test from_map_tree with through parameter for lists."""
+        d = {
+            'items': [
+                {'a': 1, 'b': 2},
+                {'a': 3, 'b': 4}
+            ]
+        }
+        t = Tdict.from_map_tree(d, through={list})
+        self.assertIsInstance(t['items'], list)
+        self.assertIsInstance(t['items'][0], Tdict)
+        self.assertEqual(t['items'][0]['a'], 1)
+        self.assertEqual(t['items'][1]['a'], 3)
+
+    def test_from_map_tree_with_through_tuple(self):
+        """Test from_map_tree with through parameter for tuples."""
+        d = {
+            'coords': ({'x': 0, 'y': 0}, {'x': 1, 'y': 1})
+        }
+        t = Tdict.from_map_tree(d, through={tuple})
+        self.assertIsInstance(t['coords'], tuple)
+        self.assertIsInstance(t['coords'][0], Tdict)
+        self.assertEqual(t['coords'][0]['x'], 0)
+        self.assertEqual(t['coords'][1]['x'], 1)
+
+    def test_from_map_tree_scalar_value(self):
+        """Test from_map_tree with non-mapping value."""
+        result = Tdict.from_map_tree(42)
+        self.assertEqual(result, 42)
+
+    def test_from_map_tree_with_none_values(self):
+        """Test from_map_tree with None values."""
+        d = {
+            'key1': None,
+            'key2': {
+                'inner': None
+            }
+        }
+        t = Tdict.from_map_tree(d)
+        self.assertIsNone(t['key1'])
+        self.assertIsNone(t['key2']['inner'])
+
+    def test_from_map_tree_empty_nested_dict(self):
+        """Test from_map_tree with empty nested dicts."""
+        d = {
+            'branch': {},
+            'value': 1
+        }
+        t = Tdict.from_map_tree(d)
+        self.assertIsInstance(t['branch'], Tdict)
+        self.assertEqual(len(t['branch']), 0)
+
+    def test_from_map_tree_with_mixed_through_types(self):
+        """Test from_map_tree with multiple through types."""
+        d = {
+            'data': [
+                {'items': (1, 2, 3)},
+                {'items': (4, 5, 6)}
+            ]
+        }
+        t = Tdict.from_map_tree(d, through={list, tuple})
+        self.assertIsInstance(t['data'], list)
+        self.assertIsInstance(t['data'][0], Tdict)
+        self.assertIsInstance(t['data'][0]['items'], tuple)
+
+
+class TestTmapToMapTree(unittest.TestCase):
+    """Test Tmap.to_map_tree method."""
+
+    def test_to_map_tree_empty_tmap(self):
+        """Test converting empty Tmap to dict."""
+        t = Tdict()
+        d = t.to_map_tree()
+        self.assertIsInstance(d, dict)
+        self.assertEqual(len(d), 0)
+
+    def test_to_map_tree_flat_tmap(self):
+        """Test converting flat Tmap to dict."""
+        t = Tdict()
+        t['a'] = 1
+        t['b'] = 2
+        t['c'] = 3
+        d = t.to_map_tree()
+        self.assertIsInstance(d, dict)
+        self.assertEqual(d['a'], 1)
+        self.assertEqual(d['b'], 2)
+        self.assertEqual(d['c'], 3)
+
+    def test_to_map_tree_nested_tmap(self):
+        """Test converting nested Tmap to dict."""
+        t = Tdict()
+        t['level1'] = Tdict()
+        t['level1']['level2'] = Tdict()
+        t['level1']['level2']['value'] = 42
+        d = t.to_map_tree()
+        self.assertIsInstance(d, dict)
+        self.assertIsInstance(d['level1'], dict)
+        self.assertIsInstance(d['level1']['level2'], dict)
+        self.assertEqual(d['level1']['level2']['value'], 42)
+
+    def test_to_map_tree_mixed_structure(self):
+        """Test converting mixed Tmap structure."""
+        t = Tdict()
+        t['scalar'] = 'value'
+        t['number'] = 123
+        t['nested'] = Tdict()
+        t['nested']['key1'] = 'val1'
+        d = t.to_map_tree()
+        self.assertEqual(d['scalar'], 'value')
+        self.assertEqual(d['number'], 123)
+        self.assertEqual(d['nested']['key1'], 'val1')
+
+    def test_to_map_tree_with_lists(self):
+        """Test converting Tmap containing lists."""
+        t = Tdict()
+        t['items'] = [1, 2, 3]
+        t['nested'] = Tdict()
+        t['nested']['data'] = ['a', 'b']
+        d = t.to_map_tree()
+        self.assertEqual(d['items'], [1, 2, 3])
+        self.assertEqual(d['nested']['data'], ['a', 'b'])
+
+    def test_to_map_tree_deep_nesting(self):
+        """Test converting deeply nested Tmap."""
+        t = Tdict()
+        t[('a', 'b', 'c', 'd', 'e')] = 'value'
+        d = t.to_map_tree()
+        self.assertEqual(d['a']['b']['c']['d']['e'], 'value')
+
+    def test_to_map_tree_tbunch(self):
+        """Test converting Tbunch to dict."""
+        tb = Tbunch()
+        tb.name = 'John'
+        tb.data = Tbunch()
+        tb.data.age = 30
+        tb.data.city = 'NYC'
+        d = tb.to_map_tree()
+        self.assertIsInstance(d, dict)
+        self.assertEqual(d['name'], 'John')
+        self.assertEqual(d['data']['age'], 30)
+
+    def test_to_map_tree_custom_shallow_type(self):
+        """Test to_map_tree with custom shallow_type."""
+        from collections import OrderedDict
+        t = Tdict()
+        t['z'] = 1
+        t['a'] = 2
+        d = t.to_map_tree(shallow_type=OrderedDict)
+        self.assertIsInstance(d, OrderedDict)
+
+    def test_to_map_tree_with_through_list(self):
+        """Test to_map_tree with through parameter for lists."""
+        t = Tdict()
+        t['items'] = [Tdict({'a': 1, 'b': 2}), Tdict({'a': 3, 'b': 4})]
+        d = t.to_map_tree(through={list})
+        self.assertIsInstance(d['items'], list)
+        self.assertIsInstance(d['items'][0], dict)
+        self.assertEqual(d['items'][0]['a'], 1)
+        self.assertEqual(d['items'][1]['a'], 3)
+
+    def test_to_map_tree_with_through_tuple(self):
+        """Test to_map_tree with through parameter for tuples."""
+        t = Tdict()
+        t['coords'] = (Tdict({'x': 0, 'y': 0}), Tdict({'x': 1, 'y': 1}))
+        d = t.to_map_tree(through={tuple})
+        self.assertIsInstance(d['coords'], tuple)
+        self.assertIsInstance(d['coords'][0], dict)
+        self.assertEqual(d['coords'][0]['x'], 0)
+
+    def test_to_map_tree_with_none_values(self):
+        """Test to_map_tree with None values."""
+        t = Tdict()
+        t['key1'] = None
+        t['key2'] = Tdict()
+        t['key2']['inner'] = None
+        d = t.to_map_tree()
+        self.assertIsNone(d['key1'])
+        self.assertIsNone(d['key2']['inner'])
+
+    def test_to_map_tree_empty_nested_tmap(self):
+        """Test to_map_tree with empty nested Tmaps."""
+        t = Tdict()
+        t['branch'] = Tdict()
+        t['value'] = 1
+        d = t.to_map_tree()
+        self.assertIsInstance(d['branch'], dict)
+        self.assertEqual(len(d['branch']), 0)
+
+
+class TestTmapRoundTrip(unittest.TestCase):
+    """Test round-trip conversions between Tmap and dict trees."""
+
+    def test_roundtrip_dict_to_tmap_to_dict(self):
+        """Test converting dict -> Tmap -> dict preserves structure."""
+        original = {
+            'a': 1,
+            'b': {
+                'c': 2,
+                'd': {
+                    'e': 3
+                }
+            },
+            'f': 'string'
+        }
+        t = Tdict.from_map_tree(original)
+        result = t.to_map_tree()
+        self.assertEqual(result, original)
+
+    def test_roundtrip_tmap_to_dict_to_tmap(self):
+        """Test converting Tmap -> dict -> Tmap preserves structure."""
+        t1 = Tdict()
+        t1[('a', 'b', 'c')] = 1
+        t1[('a', 'b', 'd')] = 2
+        t1[('x', 'y')] = 3
+        t1['scalar'] = 42
+
+        d = t1.to_map_tree()
+        t2 = Tdict.from_map_tree(d)
+
+        # Both should have same leaf values
+        self.assertEqual(t1[('a', 'b', 'c')], t2[('a', 'b', 'c')])
+        self.assertEqual(t1[('a', 'b', 'd')], t2[('a', 'b', 'd')])
+        self.assertEqual(t1[('x', 'y')], t2[('x', 'y')])
+        self.assertEqual(t1['scalar'], t2['scalar'])
+
+    def test_roundtrip_with_lists(self):
+        """Test round-trip with lists."""
+        original = {
+            'data': [
+                {'a': 1},
+                {'b': 2}
+            ]
+        }
+        t = Tdict.from_map_tree(original, through={list})
+        result = t.to_map_tree(through={list})
+        self.assertEqual(result, original)
+
+    def test_roundtrip_tbunch_with_attributes(self):
+        """Test round-trip with Tbunch preserving attribute access."""
+        original = {
+            'user': {
+                'name': 'John',
+                'email': 'john@example.com'
+            }
+        }
+        tb = Tbunch.from_map_tree(original)
+        self.assertEqual(tb.user.name, 'John')
+        result = tb.to_map_tree()
+        self.assertEqual(result, original)
+
+    def test_roundtrip_complex_nested_structure(self):
+        """Test round-trip with complex nested structure."""
+        original = {
+            'level1': {
+                'level2a': {
+                    'value': 1,
+                    'data': [1, 2, 3]
+                },
+                'level2b': {
+                    'value': 2
+                }
+            },
+            'scalar': 'test'
+        }
+        t = Tdict.from_map_tree(original)
+        result = t.to_map_tree()
+        self.assertEqual(result, original)
+
+    def test_roundtrip_empty_structures(self):
+        """Test round-trip with empty structures."""
+        original = {
+            'empty_branch': {},
+            'value': 1
+        }
+        t = Tdict.from_map_tree(original)
+        result = t.to_map_tree()
+        self.assertEqual(result, original)
+
+
+class TestTmapConversionEdgeCases(unittest.TestCase):
+    """Test edge cases and special scenarios for conversion methods."""
+
+    def test_from_map_tree_preserves_scalar_types(self):
+        """Test that from_map_tree preserves scalar value types."""
+        d = {
+            'int': 42,
+            'float': 3.14,
+            'str': 'hello',
+            'bool': True,
+            'none': None
+        }
+        t = Tdict.from_map_tree(d)
+        self.assertEqual(t['int'], 42)
+        self.assertEqual(t['float'], 3.14)
+        self.assertEqual(t['str'], 'hello')
+        self.assertEqual(t['bool'], True)
+        self.assertIsNone(t['none'])
+
+    def test_to_map_tree_preserves_scalar_types(self):
+        """Test that to_map_tree preserves scalar value types."""
+        t = Tdict()
+        t['int'] = 42
+        t['float'] = 3.14
+        t['str'] = 'hello'
+        t['bool'] = True
+        t['none'] = None
+        d = t.to_map_tree()
+        self.assertEqual(d['int'], 42)
+        self.assertEqual(d['float'], 3.14)
+        self.assertEqual(d['str'], 'hello')
+        self.assertEqual(d['bool'], True)
+        self.assertIsNone(d['none'])
+
+    def test_from_map_tree_with_numeric_string_keys(self):
+        """Test from_map_tree with numeric string keys."""
+        d = {
+            '1': 'one',
+            '2': {'3': 'three'}
+        }
+        t = Tdict.from_map_tree(d)
+        self.assertEqual(t['1'], 'one')
+        self.assertEqual(t['2']['3'], 'three')
+
+    def test_from_map_tree_with_special_characters_in_keys(self):
+        """Test from_map_tree with special characters in keys."""
+        d = {
+            'key-with-dash': 1,
+            'key.with.dot': 2,
+            'key with space': 3
+        }
+        t = Tdict.from_map_tree(d)
+        self.assertEqual(t['key-with-dash'], 1)
+        self.assertEqual(t['key.with.dot'], 2)
+        self.assertEqual(t['key with space'], 3)
+
+    def test_from_map_tree_large_structure(self):
+        """Test from_map_tree with large structure."""
+        d = {}
+        for i in range(100):
+            d[f'key_{i}'] = {'nested': i}
+        t = Tdict.from_map_tree(d)
+        self.assertEqual(len(t), 100)
+        self.assertEqual(t['key_50']['nested'], 50)
+
+    def test_to_map_tree_large_structure(self):
+        """Test to_map_tree with large structure."""
+        t = Tdict()
+        for i in range(100):
+            t[f'key_{i}'] = Tdict()
+            t[f'key_{i}']['nested'] = i
+        d = t.to_map_tree()
+        self.assertEqual(len(d), 100)
+        self.assertEqual(d['key_50']['nested'], 50)
+
+    def test_from_map_tree_with_duplicate_nested_dicts(self):
+        """Test from_map_tree behavior with nested dicts (should create copies)."""
+        shared_dict = {'value': 42}
+        d = {
+            'branch1': shared_dict,
+            'branch2': shared_dict
+        }
+        t = Tdict.from_map_tree(d)
+        # Both branches should have independent Tdict copies
+        self.assertEqual(t['branch1']['value'], 42)
+        self.assertEqual(t['branch2']['value'], 42)
+
+    def test_to_map_tree_with_duplicate_nested_tmaps(self):
+        """Test to_map_tree behavior with nested Tmaps (should create copies)."""
+        shared_tmap = Tdict()
+        shared_tmap['value'] = 42
+        t = Tdict()
+        t['branch1'] = shared_tmap
+        t['branch2'] = shared_tmap
+        d = t.to_map_tree()
+        # Both branches should have independent dict copies
+        self.assertEqual(d['branch1']['value'], 42)
+        self.assertEqual(d['branch2']['value'], 42)
+
+    def test_from_map_tree_circular_reference_handling(self):
+        """Test from_map_tree with structure that would have circular refs."""
+        # Create a dict that would fail if we allowed true circular refs
+        d = {'a': {'b': {'c': 1}}}
+        t = Tdict.from_map_tree(d)
+        # Should successfully convert without infinite recursion
+        self.assertEqual(t['a']['b']['c'], 1)
+
+    def test_to_map_tree_deeply_nested_many_leaves(self):
+        """Test to_map_tree with many leaves at different depths."""
+        t = Tdict()
+        t['a'] = 1
+        t['b'] = Tdict()
+        t['b']['c'] = 2
+        t['b']['d'] = Tdict()
+        t['b']['d']['e'] = 3
+        d = t.to_map_tree()
+        self.assertEqual(d['a'], 1)
+        self.assertEqual(d['b']['c'], 2)
+        self.assertEqual(d['b']['d']['e'], 3)
+
+
 if __name__ == '__main__':
     unittest.main()
