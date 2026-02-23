@@ -22,7 +22,7 @@ class TMutableMapping(MutableMapping, ABC):
 
 class Tmap(TMutableMapping, ABC):
     """
-    Tree of `Bunch`.
+    Tree of `MutableMapping`s.
 
     Items of `str` keys can be accessed either as attributes or as items.
     The tree can be accessed recursively using `tuple` keys.
@@ -225,6 +225,11 @@ class Tmap(TMutableMapping, ABC):
                 yield k,
 
     def copy(self):
+        """
+
+        Returns:
+            Tmap: Copy of this `Tmap`.
+        """
         res = type(self)()
         res.update(self)
         return res
