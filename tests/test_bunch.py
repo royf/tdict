@@ -336,41 +336,50 @@ class TestBunchXorOperator(unittest.TestCase):
         self.assertNotIn('c', result)
 
 
-class TestBunchMerge(unittest.TestCase):
-    """Test merge functionality."""
+class TestBunchUpdate(unittest.TestCase):
+    """Test update functionality with operators."""
 
-    def test_merge_with_add_operator(self):
-        """Test merge with addition operator."""
+    def test_update_with_add_operator(self):
+        """Test update with addition operator."""
         b = Bunch(a=1, b=2)
-        b.merge({'a': 10, 'c': 3}, operator.add)
+        b.update({'a': 10, 'c': 3}, operator.add)
 
         self.assertEqual(b['a'], 11)  # 1 + 10
         self.assertEqual(b['b'], 2)
         self.assertEqual(b['c'], 3)
 
-    def test_merge_with_multiply_operator(self):
-        """Test merge with multiplication operator."""
+    def test_update_with_multiply_operator(self):
+        """Test update with multiplication operator."""
         b = Bunch(a=5, b=2)
-        b.merge({'a': 3, 'c': 2}, operator.mul)
+        b.update({'a': 3, 'c': 2}, operator.mul)
 
         self.assertEqual(b['a'], 15)  # 5 * 3
         self.assertEqual(b['b'], 2)
         self.assertEqual(b['c'], 2)
 
-    def test_merge_new_keys_added(self):
+    def test_update_new_keys_added(self):
         """Test that new keys are simply added."""
         b = Bunch(a=1)
-        b.merge({'b': 2, 'c': 3}, operator.add)
+        b.update({'b': 2, 'c': 3}, operator.add)
 
         self.assertEqual(b['b'], 2)
         self.assertEqual(b['c'], 3)
 
-    def test_merge_with_custom_operator(self):
-        """Test merge with custom operator."""
+    def test_update_with_custom_operator(self):
+        """Test update with custom operator."""
         b = Bunch(a=10, b=20)
-        b.merge({'a': 3, 'c': 5}, lambda x, y: x - y)
+        b.update({'a': 3, 'c': 5}, lambda x, y: x - y)
 
         self.assertEqual(b['a'], 7)  # 10 - 3
+
+    def test_update_with_no_operator(self):
+        """Test update without operator (default: choose other value)."""
+        b = Bunch(a=1, b=2)
+        b.update({'a': 10, 'c': 3})
+
+        self.assertEqual(b['a'], 10)  # Default: takes value from other
+        self.assertEqual(b['b'], 2)
+        self.assertEqual(b['c'], 3)
 
 
 class TestBunchArithmeticOperators(unittest.TestCase):

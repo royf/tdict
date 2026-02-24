@@ -334,11 +334,11 @@ class TestTmapCopy(unittest.TestCase):
         self.assertEqual(tmap2['l1']['l2']['value'], 'original')
 
 
-class TestTmapMerge(unittest.TestCase):
-    """Test merge method."""
+class TestTmapUpdate(unittest.TestCase):
+    """Test update method."""
 
-    def test_merge_flat_with_flat(self):
-        """Test merging two flat Tmaps."""
+    def test_update_flat_with_flat(self):
+        """Test updating two flat Tmaps."""
         tmap1 = Tdict()
         tmap1['a'] = 10
         tmap1['b'] = 20
@@ -346,14 +346,14 @@ class TestTmapMerge(unittest.TestCase):
         tmap2['a'] = 5
         tmap2['c'] = 30
 
-        tmap1.merge(tmap2, operator.add)
+        tmap1.update(tmap2, operator.add)
 
         self.assertEqual(tmap1['a'], 15)  # 10 + 5
         self.assertEqual(tmap1['b'], 20)
         self.assertEqual(tmap1['c'], 30)
 
-    def test_merge_nested_with_flat(self):
-        """Test merging nested Tmap with flat one."""
+    def test_update_nested_with_flat(self):
+        """Test updating nested Tmap with flat one."""
         tmap1 = Tdict()
         tmap1['nested'] = Tdict()
         tmap1['nested']['value'] = 100
@@ -361,36 +361,36 @@ class TestTmapMerge(unittest.TestCase):
         tmap2['nested'] = Tdict()
         tmap2['nested']['value'] = 50
 
-        tmap1.merge(tmap2, operator.add)
+        tmap1.update(tmap2, operator.add)
 
         self.assertEqual(tmap1['nested']['value'], 150)
 
-    def test_merge_with_multiply(self):
-        """Test merge with multiplication operator."""
+    def test_update_with_multiply(self):
+        """Test update with multiplication operator."""
         tmap1 = Tdict()
         tmap1['a'] = 3
         tmap1['b'] = 2
         tmap2 = Tdict()
         tmap2['a'] = 4
 
-        tmap1.merge(tmap2, operator.mul)
+        tmap1.update(tmap2, operator.mul)
 
         self.assertEqual(tmap1['a'], 12)  # 3 * 4
         self.assertEqual(tmap1['b'], 2)
 
-    def test_merge_with_scalar(self):
-        """Test merging Tmap with scalar value."""
+    def test_update_with_scalar(self):
+        """Test updating Tmap with scalar value."""
         tmap1 = Tdict()
         tmap1['a'] = 10
         tmap1['b'] = 20
 
-        tmap1.merge(5, operator.add)
+        tmap1.update(5, operator.add)
 
         self.assertEqual(tmap1['a'], 15)  # 10 + 5
         self.assertEqual(tmap1['b'], 25)  # 20 + 5
 
-    def test_merge_complex_structure(self):
-        """Test merge with complex nested structure."""
+    def test_update_complex_structure(self):
+        """Test update with complex nested structure."""
         tmap1 = Tdict()
         tmap1['b1'] = Tdict()
         tmap1['b1']['a'] = 1
@@ -401,14 +401,14 @@ class TestTmapMerge(unittest.TestCase):
         tmap2['b1']['a'] = 10
         tmap2['b1']['c'] = 30
 
-        tmap1.merge(tmap2, operator.add)
+        tmap1.update(tmap2, operator.add)
 
         self.assertEqual(tmap1['b1']['a'], 11)
         self.assertEqual(tmap1['b1']['b'], 2)
         self.assertEqual(tmap1['b1']['c'], 30)
 
-    def test_merge_modifies_self(self):
-        """Test that merge modifies self in place."""
+    def test_update_modifies_self(self):
+        """Test that update modifies self in place."""
         tmap1 = Tdict()
         tmap1['a'] = 1
         tmap1_id = id(tmap1)
@@ -416,10 +416,59 @@ class TestTmapMerge(unittest.TestCase):
         tmap2 = Tdict()
         tmap2['a'] = 2
 
-        tmap1.merge(tmap2, operator.add)
+        tmap1.update(tmap2, operator.add)
 
         self.assertEqual(id(tmap1), tmap1_id)  # Same object
         self.assertEqual(tmap1['a'], 3)
+
+    def test_update_with_no_operator(self):
+        """Test update without operator (default: choose other value)."""
+        tmap1 = Tdict()
+        tmap1['a'] = 10
+        tmap1['b'] = 20
+        tmap2 = Tdict()
+        tmap2['a'] = 5
+        tmap2['c'] = 30
+
+        tmap1.update(tmap2)
+
+        self.assertEqual(tmap1['a'], 5)  # Default: takes value from other
+        self.assertEqual(tmap1['b'], 20)
+        self.assertEqual(tmap1['c'], 30)
+
+    def test_update_leaf_with_subtree_keeps_subtree(self):
+        """Test that updating with a subtree keeps the subtree with symmetric operation."""
+        tmap1 = Tdict()
+        tmap1['a'] = Tdict()
+        tmap1['a']['x'] = 2
+
+        tmap2 = Tdict()
+        tmap2['a'] = 10
+
+        tmap1.update(tmap2, operator.add)
+
+        # tmap2['a'] is a leaf with value 10, tmap1['a'] is a subtree with leaf tmap1['a']['x'] = 2
+        # The symmetric behavior applies the operator to the leaf and the subtree's leaf
+        # Result: tmap1['a']['x'] should be 2 + 10 = 12
+        self.assertIsInstance(tmap1['a'], Tdict)
+        self.assertEqual(tmap1['a']['x'], 12)
+
+    def test_update_subtree_with_leaf_keeps_subtree(self):
+        """Test that updating a subtree with a leaf keeps the subtree with symmetric operation."""
+        tmap1 = Tdict()
+        tmap1['a'] = 5
+
+        tmap2 = Tdict()
+        tmap2['a'] = Tdict()
+        tmap2['a']['x'] = 10
+
+        tmap1.update(tmap2, operator.add)
+
+        # tmap1['a'] is a leaf with value 5, tmap2['a'] is a subtree with leaf tmap2['a']['x'] = 10
+        # The symmetric behavior applies the operator to both leaves
+        # Result: tmap1['a']['x'] should be 5 + 10 = 15
+        self.assertIsInstance(tmap1['a'], Tdict)
+        self.assertEqual(tmap1['a']['x'], 15)
 
 
 class TestTdictSpecific(unittest.TestCase):
@@ -519,14 +568,14 @@ class TestTbunchSpecific(unittest.TestCase):
         tb.l1.l2.value = 42
         self.assertEqual(tb[('l1', 'l2', 'value')], 42)
 
-    def test_tbunch_merge_with_attributes(self):
-        """Test merge on Tbunch."""
+    def test_tbunch_update_with_attributes(self):
+        """Test update on Tbunch."""
         tb1 = Tbunch()
         tb1['a'] = 10
         tb2 = Tbunch()
         tb2['a'] = 5
 
-        tb1.merge(tb2, operator.add)
+        tb1.update(tb2, operator.add)
 
         self.assertEqual(tb1.a, 15)
 
@@ -716,8 +765,8 @@ class TestTmapEdgeCases(unittest.TestCase):
         del tmap['branch']['a']
         self.assertEqual(len(tmap), 1)
 
-    def test_merge_with_custom_operator(self):
-        """Test merge with custom operator."""
+    def test_update_with_custom_operator(self):
+        """Test update with custom operator."""
         tmap1 = Tdict()
         tmap1['a'] = 10
         tmap1['b'] = 20
@@ -726,7 +775,7 @@ class TestTmapEdgeCases(unittest.TestCase):
         tmap2['a'] = 3
 
         # Custom operator: take maximum
-        tmap1.merge(tmap2, max)
+        tmap1.update(tmap2, max)
 
         self.assertEqual(tmap1['a'], 10)
         self.assertEqual(tmap1['b'], 20)
@@ -872,11 +921,11 @@ class TestTmapWithTbunch(unittest.TestCase):
         self.assertEqual(keys, {('a', 'x'), ('a', 'y'), ('b',)})
 
 
-class TestTmapMergeComplexScenarios(unittest.TestCase):
-    """Test complex merge scenarios."""
+class TestTmapUpdateComplexScenarios(unittest.TestCase):
+    """Test complex update scenarios."""
 
-    def test_merge_asymmetric_trees(self):
-        """Test merging trees with different structures."""
+    def test_update_asymmetric_trees(self):
+        """Test updating trees with different structures."""
         t1 = Tdict()
         t1['a'] = 1
 
@@ -884,13 +933,13 @@ class TestTmapMergeComplexScenarios(unittest.TestCase):
         t2['b'] = Tdict()
         t2['b']['c'] = 2
 
-        t1.merge(t2, operator.add)
+        t1.update(t2, operator.add)
 
         self.assertEqual(t1[('a',)], 1)
         self.assertEqual(t1[('b', 'c')], 2)
 
-    def test_merge_leaf_with_tmap(self):
-        """Test merging where one has Tmap and other has leaf."""
+    def test_update_leaf_with_tmap(self):
+        """Test updating where one has Tmap and other has leaf."""
         t1 = Tdict()
         t1['a'] = Tdict()
         t1['a']['x'] = 2
@@ -898,14 +947,16 @@ class TestTmapMergeComplexScenarios(unittest.TestCase):
         t2 = Tdict()
         t2['a'] = 10
 
-        t1.merge(t2, operator.add)
+        t1.update(t2, operator.add)
 
         # t2['a'] is a leaf, t1['a'] is Tmap
         # Result should apply op to leaf value with Tmap values
+        # New symmetric behavior: tmap1['a']['x'] becomes 2 + 10 = 12
         self.assertIsInstance(t1['a'], Tdict)
+        self.assertEqual(t1['a']['x'], 12)
 
-    def test_merge_new_branches(self):
-        """Test merge adds new branches from other."""
+    def test_update_new_branches(self):
+        """Test update adds new branches from other."""
         t1 = Tdict()
         t1['a'] = 1
 
@@ -913,7 +964,7 @@ class TestTmapMergeComplexScenarios(unittest.TestCase):
         t2['b'] = Tdict()
         t2['b']['x'] = 2
 
-        t1.merge(t2, operator.add)
+        t1.update(t2, operator.add)
 
         self.assertEqual(t1[('a',)], 1)
         self.assertEqual(t1[('b', 'x')], 2)

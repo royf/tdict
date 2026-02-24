@@ -114,7 +114,7 @@ class Bunch(MutableMapping):
             Bunch: Mapping of `keys` to their values, optionally with default values if missing.
         """
         if isinstance(keys, Mapping):
-            return Bunch({k: self.d.get(k, v) for k, v in keys.items()})
+            return Bunch({k: self.d.get(k, default) for k, default in keys.items()})
         else:
             return Bunch({k: self.d[k] for k in keys if k in self.d})
 
@@ -128,7 +128,7 @@ class Bunch(MutableMapping):
         Returns:
             Bunch: Mapping of `keys` to their values, with set default values if missing.
         """
-        return Bunch({k: self.d.setdefault(k, v) for k, v in keys.items()})
+        return Bunch({k: self.d.setdefault(k, default) for k, default in keys.items()})
 
     def pop_items(self, keys):
         """
@@ -142,21 +142,25 @@ class Bunch(MutableMapping):
             Bunch: Mapping of `keys` to their popped values, optionally with default values if missing.
         """
         if isinstance(keys, Mapping):
-            return Bunch({k: self.d.pop(k, v) for k, v in keys.items()})
+            return Bunch({k: self.d.pop(k, default) for k, default in keys.items()})
         else:
             return Bunch({k: self.d.pop(k) for k in keys if k in self.d})
 
-    def merge(self, other, op):
+    def update(self, other, op=None):
         """
         Update items from `other`, applying the binary `op` to `(self[key], other[key])` for each `key` both contain.
 
         Args:
-            other (Mapping[str, Any]): `Mapping` to merge from.
-            op ((Any, Any) -> Any): Merge operator, applied as `op(self_val, other_val)`.
+            other (Mapping[str, Any]): `Mapping` to update from.
+            op ((Any, Any) -> Any): Update operator, applied as `op(self_val, other_val)`.
+                Default: Choose the `other` value.
         """
         for k, v in other.items():
             if k in self.d:
-                self.d[k] = op(self.d[k], v)
+                if op is None:
+                    self.d[k] = v
+                else:
+                    self.d[k] = op(self.d[k], v)
             else:
                 self.d[k] = v
 
@@ -196,7 +200,7 @@ class Op(object):
                 res = self_
             else:
                 res = self_.copy()
-            res.merge(other, self.op)
+            res.update(other, self.op)
             return res
 
         return apply.__get__(obj, objtype)
@@ -205,7 +209,7 @@ class Op(object):
 OPERATORS = {
     'add': operator.iadd,
     'floordiv': operator.ifloordiv,
-    'or': lambda x, y: y,
+    'or': None,
     'lshift': operator.ilshift,
     'matmul': operator.imatmul,
     'mod': operator.imod,

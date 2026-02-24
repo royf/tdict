@@ -234,7 +234,7 @@ class Tmap(TMutableMapping, ABC):
         res.update(self)
         return res
 
-    def merge(self, other, op):
+    def update(self, other, op=None):
         """
         Update items from `other`, applying the binary `op` to value pairs from `self` and `other`, in this order.
         For each pair of leaf items, `(self_key, self_val)` and `(other_key, other_val)`,
@@ -243,9 +243,12 @@ class Tmap(TMutableMapping, ABC):
         The result will also have all leaf items in either source that have no prefix leaf items.
 
         Args:
-            other (Tmap | Any): `Tmap` to merge from.
-            op ((Any, Any) -> Any): Merge operator, applied as `op(self_val, other_val)`.
+            other (Tmap | Any): `Tmap` to update from.
+            op ((Any, Any) -> Any): Update operator, applied as `op(self_val, other_val)`.
+                Default: Choose the `other` value.
         """
+        if op is None:
+            op = lambda x, y: y
         if isinstance(other, Tmap):
             for k, other_child in other.as_shallow().items():
                 try:
@@ -257,13 +260,13 @@ class Tmap(TMutableMapping, ABC):
                         new_child = other_child
                 else:
                     if isinstance(self_child, Tmap):
-                        self_child.merge(other_child, op)
+                        self_child.update(other_child, op)
                         continue
                     elif isinstance(other_child, Tmap):
                         new_child = type(other_child)()
-                        new_child.update(((k_, op(self_child, v_)) for k_, v_ in other_child.items()))
+                        super(Tmap, new_child).update((k_, op(self_child, v_)) for k_, v_ in other_child.items())
                     else:
                         new_child = op(self_child, other_child)
                 self.as_shallow()[k] = new_child
         else:
-            self.update(((k, op(v, other)) for k, v in self.items()))
+            super().update((k, op(v, other)) for k, v in self.items())
